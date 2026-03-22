@@ -301,8 +301,8 @@ def list_users(cfg: SandboxConfig) -> list[dict]:
     return users
 
 
-def list_running_usernames(cfg: SandboxConfig) -> set[str]:
-    """Return the set of usernames that have running processes.
+def list_running_pids(cfg: SandboxConfig) -> dict[str, list[int]]:
+    """Return a mapping of username → sorted list of running PIDs.
 
     Scans /proc once and checks each process's environment for
     HOME=<user_home>, which is set by bwrap and inherited by all
@@ -310,22 +310,31 @@ def list_running_usernames(cfg: SandboxConfig) -> set[str]:
     """
     managed = {u["username"] for u in list_users(cfg)}
     if not managed:
-        return set()
+        return {}
 
-    running: set[str] = set()
+    result: dict[str, list[int]] = {}
+    markers = {username: f"HOME={cfg.user_home(username)}".encode() for username in managed}
     proc = Path("/proc")
     try:
         pids = [p for p in proc.iterdir() if p.name.isdigit()]
     except OSError:
-        return set()
+        return {}
 
     for pid_path in pids:
         try:
             raw = (pid_path / "environ").read_bytes()
         except OSError:
             continue
-        for username in managed - running:
-            if f"HOME={cfg.user_home(username)}".encode() in raw:
-                running.add(username)
+        for username, marker in markers.items():
+            if marker in raw:
+                result.setdefault(username, []).append(int(pid_path.name))
 
-    return running
+    for pids_list in result.values():
+        pids_list.sort()
+
+    return result
+
+
+def list_running_usernames(cfg: SandboxConfig) -> set[str]:
+    """Return the set of usernames that have running processes."""
+    return set(list_running_pids(cfg).keys())
