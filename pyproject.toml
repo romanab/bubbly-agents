@@ -15,6 +15,7 @@ dependencies = [
 [project.scripts]
 sandbox-ctl = "sandbox.cli.main:cli"
 sandbox-tui = "sandbox.tui.app:main"
+jobctl = "sandbox.cli.jobctl:jobctl_group"
 
 [tool.setuptools.packages.find]
 where = ["."]
