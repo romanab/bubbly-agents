@@ -1,12 +1,12 @@
 # bubbly-agents
 
-### Setup for agents in bubblewrapped environments
+### Setup for agents in bubblewrapped environments (coded with Claude Code)
 
 ![Bubbly 'Gents logo](images/bubbly-gents-logo.png)
 
 ---
 
-Tools for creating and managing **bubblewrap-sandboxed user accounts** on Linux. Each user's sandbox is launched via `sandbox-ctl user run --user <name>` — a generated bwrap launcher script that constructs a private filesystem namespace with controlled access to the host.
+Tools for creating and managing **bubblewrap-sandboxed user accounts** on Linux. Each user's sandbox is launched via `sandbox-ctl user run --user <name>` — a generated bwrap launcher script that constructs a private filesystem namespace with controlled access to the host. An optional TUI is available for managing environments. To invoke use: `sandbox-tui` 
 
 Designed for giving untrusted or semi-trusted users access to a machine without exposing the full system. No root required for management or launch.
 
@@ -37,22 +37,12 @@ Create a separate Linux account with a high UID to manage sandboxes. Using a ded
 
 ```bash
 # As root (or with sudo):
-useradd -u 60000 -m -s /bin/bash sandboxadmin
+useradd -u 60000 -m -s /bin/bash agents
 ```
 
-All subsequent steps run as `sandboxadmin`.
-
-#### 2. Install Homebrew for Linux
+#### 2. Install Homebrew for Linux from your regular account since sudo is required
 
 Homebrew installs to `/home/linuxbrew/.linuxbrew/`. Follow the instructions at [brew.sh](https://brew.sh).
-
-Add Homebrew to PATH — put this in `~/.bashrc` (or `~/.profile`):
-
-```bash
-export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-```
-
-Then reload: `source ~/.bashrc`
 
 #### 3. Install `uv`
 
@@ -60,13 +50,42 @@ Then reload: `source ~/.bashrc`
 brew install uv
 ```
 
+#### 3. Install `direnv` (for easy Python virtual environment activation)
+
+```bash
+brew install direnv
+```
+
+#### All subsequent steps run from the `agents` account.
+
+Login to the linux `agents` account created earlier.
+
+Set up Homebrew and direnv in `~/.bashrc`:
+
+```bash
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+eval "$(direnv hook bash)"
+
+# Restore PS1 for .venv activation via direnv
+show_virtual_env() {
+  if [[ -n "$VIRTUAL_ENV" && -n "$DIRENV_DIR" ]]; then
+    echo "($(basename $VIRTUAL_ENV))"
+  fi
+}
+export -f show_virtual_env
+PS1='$(show_virtual_env)'$PS1
+```
+
+Then reload: `source ~/.bashrc`
+
 #### 4. Clone the project and install
 
 ```bash
-git clone <repo-url>
-cd sandboxed-user-account
+git clone https://github.com/romanab/bubbly-agents.git
+cd bubbly-agents
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate 
 uv pip install -e .
 ```
 
