@@ -106,6 +106,7 @@ sandbox-ctl user list
 sandbox-ctl user create --user NAME [OPTIONS] [--dry-run]
 sandbox-ctl user run    --user NAME
 sandbox-ctl user audit  --user NAME
+sandbox-ctl user regen  --user NAME
 sandbox-ctl user delete --user NAME [--keep-home] [--force] [--dry-run]
 sandbox-ctl user profile      --profile NAME --user NAME [--dry-run]
 sandbox-ctl user profile-list

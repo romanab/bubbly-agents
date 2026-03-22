@@ -184,6 +184,24 @@ def user_install(ctx, sandbox, binary, dest, dry_run):
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
+@user_group.command('regen')
+@click.option('--user', required=True, help='Username')
+@click.pass_context
+def user_regen(ctx, user):
+    """Regenerate the bwrap launcher for a user (picks up script/config changes)."""
+    cfg = ctx.obj['cfg']
+    try:
+        from sandbox.users import is_managed_user
+        from sandbox.launcher import generate_launcher
+        if not is_managed_user(cfg, user):
+            raise UserNotFoundError(f"User {user!r} does not exist")
+        generate_launcher(cfg.launcher_dir, cfg.users_dir, user)
+        click.echo(f"Launcher regenerated for '{user}'.")
+    except (SandboxError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @user_group.command('run')
 @click.option('--user', required=True, help='Username to run sandbox for')
 @click.pass_context

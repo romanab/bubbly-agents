@@ -294,6 +294,25 @@ class TestLauncher:
         with pytest.raises(ValueError, match="USER_HOME"):
             generate_launcher(launcher_dir, users_dir, "testuser")
 
+    def test_launcher_injects_jobctl(self, tmp_path):
+        users_dir = tmp_path / "users"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        cfg = _make_cfg(no_usr=False)
+        self._write_state(users_dir, "testuser", cfg)
+        content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
+        assert "/usr/local/bin/jobctl" in content
+        assert "HOME=$HOME" in content
+
+    def test_launcher_no_jobctl_when_no_usr(self, tmp_path):
+        users_dir = tmp_path / "users"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        cfg = _make_cfg(no_usr=True)
+        self._write_state(users_dir, "testuser", cfg)
+        content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
+        assert "/usr/local/bin/jobctl" not in content
+
     def test_launcher_no_unshare_pid(self, tmp_path):
         users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"

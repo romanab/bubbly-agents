@@ -21,6 +21,56 @@ def _make_mount_group_script(groups_dir: str) -> str:
         'ln -sfn "$GROUP_DIR" "$HOME/$GROUP" && echo "Mounted ~/$GROUP -> $GROUP_DIR"\n'
     )
 
+_JOBCTL_SCRIPT = (
+    "#!/bin/sh\n"
+    "_jlist() {\n"
+    "  _ppid=$PPID; _found=0\n"
+    '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
+    '  printf -- "--------  -  -------\\n"\n'
+    "  for _e in /proc/[0-9]*/environ; do\n"
+    '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
+    '    [ "$_pid" = "$_ppid" ] && continue\n'
+    '    tr "\\0" "\\n" < "$_e" 2>/dev/null | grep -Fxq "HOME=$HOME" || continue\n'
+    '    _st=$(sed "s/.*) //" "/proc/$_pid/stat" 2>/dev/null | cut -d" " -f1)\n'
+    '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
+    '    [ -z "$_cmd" ] && _cmd="[$_pid]"\n'
+    '    printf "%-8s %-1s  %s\\n" "$_pid" "${_st:-?}" "$_cmd"\n'
+    "    _found=1\n"
+    "  done\n"
+    '  [ "$_found" -eq 0 ] && echo "No background jobs."\n'
+    "}\n"
+    "_jkill() {\n"
+    '  _pid="$1"; _sig="${2:-TERM}"\n'
+    '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
+    '  tr "\\0" "\\n" < "/proc/$_pid/environ" 2>/dev/null | grep -Fxq "HOME=$HOME" \\\n'
+    '    || { echo "Error: PID $_pid is not a job in this sandbox" >&2; return 1; }\n'
+    '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
+    "}\n"
+    "_jkillall() {\n"
+    "  _ppid=$PPID; _count=0\n"
+    "  for _e in /proc/[0-9]*/environ; do\n"
+    '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
+    '    [ "$_pid" = "$_ppid" ] && continue\n'
+    '    tr "\\0" "\\n" < "$_e" 2>/dev/null | grep -Fxq "HOME=$HOME" || continue\n'
+    '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
+    "    _count=$((_count+1))\n"
+    "  done\n"
+    '  [ "$_count" -eq 0 ] && echo "No background jobs."\n'
+    "}\n"
+    'case "${1:-list}" in\n'
+    '  list)    _jlist ;;\n'
+    '  kill)    _jkill "$2" "$3" ;;\n'
+    '  killall) _jkillall ;;\n'
+    '  help|-h|--help)\n'
+    '    echo "Usage: jobctl [list|kill <pid> [sig]|killall]"\n'
+    '    echo "  list     List background processes in this sandbox (default)"\n'
+    '    echo "  kill N   Signal PID N (default: TERM)"\n'
+    '    echo "  killall  SIGTERM all background processes"\n'
+    "    ;;\n"
+    '  *) echo "Unknown command: $1" >&2; exit 1 ;;\n'
+    "esac\n"
+)
+
 _UNMOUNT_GROUP_SCRIPT = (
     "#!/bin/sh\n"
     'GROUP="$1"\n'
@@ -151,9 +201,17 @@ def generate_launcher(
         heredoc_bodies += f"\n{passwd_content}_PASSWD"
         heredoc_bodies += f"\n{group_content}_GROUP"
 
-    need_local_bin = (fake_sudo or has_groups) and not no_usr
+    need_local_bin = not no_usr
     if need_local_bin:
         local_bin_lines = "  --tmpfs /usr/local/bin \\\n"
+
+        # Always inject jobctl
+        jobctl_fd_num = next_fd
+        next_fd += 1
+        local_bin_lines += f"  --file {jobctl_fd_num} /usr/local/bin/jobctl \\\n"
+        local_bin_lines += "  --chmod 0755 /usr/local/bin/jobctl \\\n"
+        fd_redirects += f" {jobctl_fd_num}<<'_JOBCTL'"
+        heredoc_bodies += f"\n{_JOBCTL_SCRIPT}_JOBCTL"
 
         if fake_sudo:
             sudo_fd_num = next_fd
