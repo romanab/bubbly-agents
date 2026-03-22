@@ -25,6 +25,14 @@ _JOBCTL_SCRIPT = (
     "#!/bin/sh\n"
     # grep+cut: no awk dependency, works with minimal PATH
     "_me=$(grep '^Uid:' /proc/self/status 2>/dev/null | cut -f2)\n"
+    # Processes in the initial user namespace are host processes (bash, tmux, systemd…).
+    # Sandbox background jobs live in a bwrap user namespace — a different inode.
+    # readlink /proc/<pid>/ns/user is world-accessible (no ptrace needed).
+    "_init_ns=$(readlink /proc/1/ns/user 2>/dev/null)\n"
+    "_in_sandbox() {\n"
+    '  _ns=$(readlink "/proc/$1/ns/user" 2>/dev/null)\n'
+    '  [ -n "$_ns" ] && [ "$_ns" != "$_init_ns" ]\n'
+    "}\n"
     "_jlist() {\n"
     "  _found=0\n"
     '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
@@ -35,6 +43,7 @@ _JOBCTL_SCRIPT = (
     '    [ "$_pid" = "$$" ] && continue\n'
     '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
     '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
+    '    _in_sandbox "$_pid" || continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    _st=$(grep "^State:" "$_s" 2>/dev/null | cut -f2 | cut -c1)\n'
@@ -47,8 +56,8 @@ _JOBCTL_SCRIPT = (
     '  _pid="$1"; _sig="${2:-TERM}"\n'
     '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
     '  _uid=$(grep "^Uid:" "/proc/$_pid/status" 2>/dev/null | cut -f2)\n'
-    '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] \\\n'
-    '    || { echo "Error: PID $_pid is not your process" >&2; return 1; }\n'
+    '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] && _in_sandbox "$_pid" \\\n'
+    '    || { echo "Error: PID $_pid is not a sandbox job" >&2; return 1; }\n'
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
     "_jkillall() {\n"
@@ -59,6 +68,7 @@ _JOBCTL_SCRIPT = (
     '    [ "$_pid" = "$$" ] && continue\n'
     '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
     '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
+    '    _in_sandbox "$_pid" || continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
