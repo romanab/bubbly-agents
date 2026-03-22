@@ -28,23 +28,32 @@ _JOBCTL_SCRIPT = (
     "_PIDS_FILE=$HOME/.jobctl_pids\n"
     "_me=$(grep '^Uid:' /proc/self/status 2>/dev/null | cut -f2)\n"
     "_jlist() {\n"
-    "  _found=0\n"
-    '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
-    '  printf -- "--------  -  -------\\n"\n'
+    "  _found=0; _n=0\n"
+    '  printf "[N]  %-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
+    '  printf -- "---  --------  -  -------\\n"\n'
     '  [ -s "$_PIDS_FILE" ] || { echo "No background jobs."; return; }\n'
     '  while IFS= read -r _pid; do\n'
     '    [ -z "$_pid" ] && continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    _st=$(grep "^State:" "/proc/$_pid/status" 2>/dev/null | cut -f2 | cut -c1)\n'
-    '    printf "%-8s %-1s  %s\\n" "$_pid" "${_st:-?}" "$_cmd"\n'
+    '    _n=$((_n+1))\n'
+    '    printf "[%s]  %-8s %-1s  %s\\n" "$_n" "$_pid" "${_st:-?}" "$_cmd"\n'
     "    _found=1\n"
     '  done < "$_PIDS_FILE"\n'
     '  [ "$_found" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     "_jkill() {\n"
-    '  _pid="$1"; _sig="${2:-TERM}"\n'
-    '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
+    '  _arg="$1"; _sig="${2:-TERM}"\n'
+    '  [ -z "$_arg" ] && { echo "Usage: jobctl kill <%N|pid> [signal]" >&2; return 1; }\n'
+    '  case "$_arg" in\n'
+    '    %*)\n'
+    '      _n="${_arg#%}"\n'
+    '      _pid=$(sed -n "${_n}p" "$_PIDS_FILE" 2>/dev/null)\n'
+    '      [ -z "$_pid" ] && { echo "Error: no job %$_n" >&2; return 1; }\n'
+    '      ;;\n'
+    '    *) _pid="$_arg" ;;\n'
+    '  esac\n'
     '  _uid=$(grep "^Uid:" "/proc/$_pid/status" 2>/dev/null | cut -f2)\n'
     '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] \\\n'
     '    || { echo "Error: PID $_pid is not your process" >&2; return 1; }\n'
@@ -69,7 +78,8 @@ _JOBCTL_SCRIPT = (
     '  help|-h|--help)\n'
     '    echo "Usage: jobctl [list|kill <pid> [sig]|killall]"\n'
     '    echo "  list     List background jobs for this sandbox user (default)"\n'
-    '    echo "  kill N   Signal PID N (default: TERM)"\n'
+    '    echo "  kill %N  Signal job N by number (default: TERM)"\n'
+    '    echo "  kill pid Signal by PID"\n'
     '    echo "  killall  SIGTERM all listed background jobs"\n'
     "    ;;\n"
     '  *) echo "Unknown command: $1" >&2; exit 1 ;;\n'
