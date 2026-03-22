@@ -50,7 +50,7 @@ Homebrew installs to `/home/linuxbrew/.linuxbrew/`. Follow the instructions at [
 brew install uv
 ```
 
-#### 3. Install `direnv` (for easy Python virtual environment activation)
+#### 4. Install `direnv` (for easy Python virtual environment activation)
 
 ```bash
 brew install direnv
@@ -79,7 +79,7 @@ PS1='$(show_virtual_env)'$PS1
 
 Then reload: `source ~/.bashrc`
 
-#### 4. Clone the project and install
+#### 5. Clone the project and install
 
 ```bash
 git clone https://github.com/romanab/bubbly-agents.git
@@ -91,7 +91,7 @@ uv pip install -e .
 
 `uv venv` creates `.venv/` inside the project directory. The package and its entry points (`sandbox-ctl`, `sandbox-tui`) are installed into that local venv.
 
-#### 5. Optional: auto-activate with direnv
+#### 6. Optional: auto-activate with direnv
 
 The project ships an `.envrc` that activates the venv automatically when you `cd` into the project directory. If you have `direnv` installed:
 
