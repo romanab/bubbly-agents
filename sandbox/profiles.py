@@ -252,7 +252,7 @@ def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run:
 
     # 3. Bind entries (extra mounts)
     from sandbox.state import read_extra_mounts, write_extra_mounts
-    existing = read_extra_mounts(cfg.state_dir, username)
+    existing = read_extra_mounts(cfg.users_dir, username)
     new_mounts = existing + profile.bind_entries
     seen: set[tuple[str, str, str]] = set()
     deduped: list[MountEntry] = []
@@ -261,10 +261,10 @@ def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run:
         if key not in seen:
             seen.add(key)
             deduped.append(m)
-    write_extra_mounts(cfg.state_dir, username, deduped, dry_run)
+    write_extra_mounts(cfg.users_dir, username, deduped, dry_run)
 
     # 4. Dotfiles (copy from profiles dir)
-    user_home = cfg.homes_dir / username
+    user_home = cfg.user_home(username)
     profile_dir = profiles_dir / profile_name
     for dotfile in profile.dotfiles:
         src = profile_dir / dotfile
@@ -290,8 +290,8 @@ def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run:
 
     # 6. Regenerate launcher
     from sandbox.launcher import generate_launcher
-    generate_launcher(cfg.launcher_dir, cfg.state_dir, username, dry_run)
+    generate_launcher(cfg.launcher_dir, cfg.users_dir, username, dry_run)
 
     # 7. Write profile name
     from sandbox.state import write_profile_name
-    write_profile_name(cfg.state_dir, username, profile_name, dry_run)
+    write_profile_name(cfg.users_dir, username, profile_name, dry_run)

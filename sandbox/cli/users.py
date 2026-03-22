@@ -84,7 +84,7 @@ def user_delete(ctx, user, keep_home, force, dry_run):
         click.echo(f"\nAudit for user '{user}':")
         click.echo(f"  Home:       {audit['actual_home']} ({'present' if audit['home_present'] else 'missing'})")
         click.echo(f"  Launcher:   {audit['launcher']} ({'present' if audit['launcher_present'] else 'missing'})")
-        click.echo(f"  State dir:  {audit['state_dir']} ({'present' if audit['state_dir_present'] else 'missing'})")
+        click.echo(f"  Container:  {audit['user_container']} ({'present' if audit['user_container_present'] else 'missing'})")
         if audit['supp_groups']:
             click.echo(f"  Groups:     {', '.join(audit['supp_groups'])}")
         if audit['private_group']:

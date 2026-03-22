@@ -134,7 +134,7 @@ class TestState:
         profile_file = tmp_path / "testuser" / "profile"
         assert not profile_file.exists()
 
-    def test_state_dir_permissions(self, tmp_path):
+    def test_users_dir_permissions(self, tmp_path):
         cfg = _make_cfg()
         write_base(tmp_path, "testuser", cfg, Path("/home/testuser"))
         user_dir = tmp_path / "testuser"
@@ -174,165 +174,165 @@ class TestState:
 # ---------------------------------------------------------------------------
 
 class TestLauncher:
-    def _write_state(self, state_dir, username, cfg, home="/home/testuser", mounts=None, uid=1001):
-        write_base(state_dir, username, cfg, Path(home))
-        write_extra_mounts(state_dir, username, mounts or [])
-        write_ids(state_dir, username, uid, uid)
+    def _write_state(self, users_dir, username, cfg, home="/home/testuser", mounts=None, uid=1001):
+        write_base(users_dir, username, cfg, Path(home))
+        write_extra_mounts(users_dir, username, mounts or [])
+        write_ids(users_dir, username, uid, uid)
 
     def test_network_full_no_unshare_net(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(network="full")
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--unshare-net" not in content
 
     def test_network_loopback_has_unshare_and_ip_link(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(network="loopback")
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--unshare-net" in content
         assert "ip link set lo up" in content
 
     def test_network_none_has_unshare_no_ip_link(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(network="none")
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--unshare-net" in content
         assert "ip link set lo up" not in content
 
     def test_no_usr_true_omits_usr_bind(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(no_usr=True)
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--ro-bind /usr /usr" not in content
 
     def test_no_usr_false_has_usr_bind(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(no_usr=False)
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--ro-bind /usr /usr" in content
 
     def test_sys_dirs_true_has_etc_and_run(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(sys_dirs=True)
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--ro-bind /etc /etc" in content
         assert "--ro-bind /run /run" in content
 
     def test_sys_dirs_false_omits_etc_and_run(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg(sys_dirs=False)
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--ro-bind /etc /etc" not in content
         assert "--ro-bind /run /run" not in content
 
     def test_launcher_file_mode_755(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         mode = stat.S_IMODE(path.stat().st_mode)
         assert mode == 0o755
 
     def test_launcher_shebang(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         first_line = path.read_text().splitlines()[0]
         assert first_line == "#!/usr/bin/env bash"
 
     def test_launcher_dry_run_no_file(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser", dry_run=True)
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser", dry_run=True)
         assert not path.exists()
 
     def test_launcher_missing_user_home_raises(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         # Write base with empty USER_HOME by manipulating the file directly
-        (state_dir / "testuser").mkdir(parents=True)
-        (state_dir / "testuser" / "base").write_text("NO_USR=0\nSYS_DIRS=0\n")
+        (users_dir / "testuser").mkdir(parents=True)
+        (users_dir / "testuser" / "base").write_text("NO_USR=0\nSYS_DIRS=0\n")
         # Also write ids so the ids check passes and we reach the USER_HOME check
-        write_ids(state_dir, "testuser", 1001, 1001)
+        write_ids(users_dir, "testuser", 1001, 1001)
         with pytest.raises(ValueError, match="USER_HOME"):
-            generate_launcher(launcher_dir, state_dir, "testuser")
+            generate_launcher(launcher_dir, users_dir, "testuser")
 
     def test_launcher_no_unshare_pid(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        self._write_state(users_dir, "testuser", cfg)
+        content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
         assert "--unshare-pid" not in content
 
     def test_launcher_has_unshare_user(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg, uid=1001)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg, uid=1001)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "--unshare-user" in content
         assert "--uid 1001" in content
         assert "--gid 1001" in content
 
     def test_launcher_has_synthetic_passwd(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg, uid=1001)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg, uid=1001)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "/etc/passwd" in content
         assert "testuser" in content
 
     def test_launcher_no_passwd_in_etc_files(self, tmp_path):
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         # ETC_FILES should not contain passwd or group
         for line in content.splitlines():
@@ -341,7 +341,7 @@ class TestLauncher:
 
     def test_mount_group_script_uses_group_dir_suffix(self, tmp_path):
         """mount-group script must resolve GROUP_DIR via {name}.group-dir subdir."""
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         groups_dir = tmp_path / "groups"
@@ -351,15 +351,15 @@ class TestLauncher:
         (grp_container / "mygrp.gid").write_text("1002\n")
         cfg = _make_cfg()
         # Write state first, then add group bind mount so it isn't overwritten
-        self._write_state(state_dir, "testuser", cfg)
-        add_group_bind_mount(state_dir, "testuser", grp_shared)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        add_group_bind_mount(users_dir, "testuser", grp_shared)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert '$GROUP/$GROUP.group-dir' in content
 
     def test_launcher_group_gid_extraction_uses_parent_name(self, tmp_path):
         """Synthetic /etc/group must use the group container name, not 'group-dir'."""
-        state_dir = tmp_path / "state"
+        users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
         groups_dir = tmp_path / "groups"
@@ -368,9 +368,9 @@ class TestLauncher:
         grp_shared.mkdir(parents=True)
         (grp_container / "mygrp.gid").write_text("1042\n")
         cfg = _make_cfg()
-        self._write_state(state_dir, "testuser", cfg)
-        add_group_bind_mount(state_dir, "testuser", grp_shared)
-        path = generate_launcher(launcher_dir, state_dir, "testuser")
+        self._write_state(users_dir, "testuser", cfg)
+        add_group_bind_mount(users_dir, "testuser", grp_shared)
+        path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
         assert "mygrp:x:1042:" in content
 

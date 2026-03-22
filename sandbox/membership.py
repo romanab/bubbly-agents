@@ -22,8 +22,8 @@ def add_member(cfg: SandboxConfig, username: str, groupname: str, dry_run: bool 
             members.append(username)
             write_group_members(cfg.groups_dir, groupname, members)
 
-    add_group_bind_mount(cfg.state_dir, username, cfg.groups_dir / groupname / f"{groupname}.group-dir", dry_run)
-    generate_launcher(cfg.launcher_dir, cfg.state_dir, username, dry_run)
+    add_group_bind_mount(cfg.users_dir, username, cfg.groups_dir / groupname / f"{groupname}.group-dir", dry_run)
+    generate_launcher(cfg.launcher_dir, cfg.users_dir, username, dry_run)
 
 
 def remove_member(cfg: SandboxConfig, username: str, groupname: str, dry_run: bool = False) -> None:
@@ -40,5 +40,5 @@ def remove_member(cfg: SandboxConfig, username: str, groupname: str, dry_run: bo
         members = [m for m in members if m != username]
         write_group_members(cfg.groups_dir, groupname, members)
 
-    remove_group_bind_mount(cfg.state_dir, username, cfg.groups_dir / groupname / f"{groupname}.group-dir", dry_run)
-    generate_launcher(cfg.launcher_dir, cfg.state_dir, username, dry_run)
+    remove_group_bind_mount(cfg.users_dir, username, cfg.groups_dir / groupname / f"{groupname}.group-dir", dry_run)
+    generate_launcher(cfg.launcher_dir, cfg.users_dir, username, dry_run)
