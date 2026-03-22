@@ -31,7 +31,7 @@ Per-user configuration is stored in `low_priv_user_dirs/state/<username>/`. The 
 
 ### Installation
 
-#### 1. Create a dedicated admin account
+#### 1. Create a dedicated linux account to hold the agents and their environments
 
 Create a separate Linux account with a high UID to manage sandboxes. Using a dedicated account keeps sandbox state isolated from your personal home directory.
 
