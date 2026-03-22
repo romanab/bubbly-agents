@@ -2,6 +2,9 @@
 # Source this file from ~/.bashrc:
 #   echo 'source ~/bubbly-agents/bubbly-agents-bashrc' >> ~/.bashrc
 
+# Start in project directory
+cd ~/bubbly-agents 2>/dev/null || true
+
 # Homebrew
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
