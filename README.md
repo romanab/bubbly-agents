@@ -6,9 +6,9 @@
 
 ---
 
-Tools for creating and managing **bubblewrap-sandboxed user accounts** on Linux. Each user's sandbox is launched via `sandbox-ctl user run --user <name>` — a generated bwrap launcher script that constructs a private filesystem namespace with controlled access to the host. An optional TUI is available for managing environments. To invoke use: `sandbox-tui` 
+Tools for creating and managing **bubblewrap-sandboxed user accounts** on Linux. Each user's sandbox is launched via `sandbox-ctl user run --user <name>` — a generated bwrap launcher script that constructs a private filesystem namespace with controlled access to the host. An optional TUI is available for managing environments via `sandbox-tui`.
 
-Designed for giving untrusted or semi-trusted users access to a machine without exposing the full system. No root required for management or launch.
+Designed for giving untrusted or semi-trusted agents access to a machine without exposing the full system. No root required for management or launch.
 
 ---
 
@@ -31,43 +31,37 @@ Per-user configuration is stored in `low_priv_user_dirs/state/<username>/`. The 
 
 ### Installation
 
-#### 1. Create a dedicated linux account to hold the agents and their environments
+#### 1. Create a dedicated Linux account to hold the agents and their environments
 
-Create a separate Linux account with a high UID to manage sandboxes. Using a dedicated account keeps sandbox state isolated from your personal home directory.
+Create a separate Linux account with a high UID. Using a dedicated account keeps sandbox state isolated from your personal home directory.
 
 ```bash
 # As root (or with sudo):
 useradd -u 60000 -m -s /bin/bash agents
 ```
 
-#### 2. Install Homebrew for Linux from your regular account since sudo is required
+#### 2. Install Homebrew for Linux
 
-Homebrew installs to `/home/linuxbrew/.linuxbrew/`. Follow the instructions at [brew.sh](https://brew.sh).
+Homebrew installs to `/home/linuxbrew/.linuxbrew/`. Follow the instructions at [brew.sh](https://brew.sh). This step requires sudo so run it from your regular account.
 
-#### 3. Install `uv`
-
-```bash
-brew install uv
-```
-
-#### 4. Install `direnv` (for easy Python virtual environment activation)
+#### 3. Install `uv` and `direnv`
 
 ```bash
-brew install direnv
+brew install uv direnv
 ```
 
 #### All subsequent steps run from the `agents` account.
 
-Login to the linux `agents` account created earlier.
-
-Set up Homebrew and direnv in `~/.bashrc`:
+Login to the `agents` account and add the following to `~/.bashrc`:
 
 ```bash
+# Homebrew
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
+# direnv (auto-activates .venv when entering the project directory)
 eval "$(direnv hook bash)"
 
-# Restore PS1 for .venv activation via direnv
+# Show active venv in prompt when direnv is managing it
 show_virtual_env() {
   if [[ -n "$VIRTUAL_ENV" && -n "$DIRENV_DIR" ]]; then
     echo "($(basename $VIRTUAL_ENV))"
@@ -75,35 +69,44 @@ show_virtual_env() {
 }
 export -f show_virtual_env
 PS1='$(show_virtual_env)'$PS1
+
+# Alert on login if tmux sessions are running
+if [[ -z "${TMUX}" && "${-}" == *i* ]] && command -v tmux >/dev/null 2>&1; then
+    _tmux_sessions=$(tmux ls 2>/dev/null) || true
+    if [[ -n "${_tmux_sessions}" ]]; then
+        echo ""
+        echo "Running tmux sessions:"
+        echo "${_tmux_sessions}"
+        echo ""
+        _tmux_count=$(echo "${_tmux_sessions}" | wc -l)
+        if [[ ${_tmux_count} -eq 1 ]]; then
+            _tmux_name=$(echo "${_tmux_sessions}" | cut -d: -f1)
+            read -r -p "Attach to '${_tmux_name}'? [Y/n]: " _tmux_reply
+            [[ "${_tmux_reply,,}" != "n" ]] && exec tmux attach -t "${_tmux_name}"
+        else
+            read -r -p "Attach to session (name, or Enter to skip): " _tmux_reply
+            [[ -n "${_tmux_reply}" ]] && exec tmux attach -t "${_tmux_reply}"
+        fi
+        unset _tmux_sessions _tmux_count _tmux_name _tmux_reply
+    fi
+fi
 ```
 
 Then reload: `source ~/.bashrc`
 
-#### 5. Clone the project and install
+#### 4. Clone the project and install
 
 ```bash
 git clone https://github.com/romanab/bubbly-agents.git
 cd bubbly-agents
 uv venv
-source .venv/bin/activate 
+direnv allow        # auto-activates .venv on every subsequent cd
 uv pip install -e .
 ```
 
-`uv venv` creates `.venv/` inside the project directory. The package and its entry points (`sandbox-ctl`, `sandbox-tui`) are installed into that local venv.
+`uv venv` creates `.venv/` inside the project directory. With direnv, `sandbox-ctl` and `sandbox-tui` are available immediately on entering the project directory without manually running `source .venv/bin/activate`.
 
-#### 6. Optional: auto-activate with direnv
-
-The project ships an `.envrc` that activates the venv automatically when you `cd` into the project directory. If you have `direnv` installed:
-
-```bash
-brew install direnv
-# Add to ~/.bashrc:
-eval "$(direnv hook bash)"
-# Then allow the project:
-direnv allow
-```
-
-With direnv, `sandbox-ctl` and `sandbox-tui` are available immediately on entering the project directory without manually running `source .venv/bin/activate`.
+---
 
 ### Quick start
 
@@ -330,6 +333,42 @@ Members listed in a group can use `mount-group <name>` to access it. The `mount-
 
 ---
 
+## Keeping Sandboxes Alive Across Disconnections
+
+Sandbox processes keep running as long as the bwrap launcher process is alive. The recommended approach is to run a single **host tmux session** under the `agents` account, with one window per sandbox:
+
+```bash
+# Start (or name) the host tmux session
+tmux new-session -s sandboxes
+
+# Open a window for each sandbox user
+sandbox-ctl user run --user alice    # window 1
+# Ctrl-B c  (new window)
+sandbox-ctl user run --user agent1   # window 2
+
+# Detach: Ctrl-B d
+# All sandboxes keep running — bwrap is a child of the tmux server,
+# which stays alive after detach.
+
+# Reattach later (or via the auto-attach prompt on login):
+tmux attach -t sandboxes
+```
+
+The `~/.bashrc` snippet in the Installation section detects running tmux sessions at login and offers to re-attach automatically.
+
+### Surviving full account logout
+
+By default, systemd kills all processes owned by a user when their last session ends. To keep sandboxes running even after a full logout, enable **linger** once:
+
+```bash
+# As root:
+loginctl enable-linger agents
+```
+
+With linger enabled, the host tmux server (and all bwrap sandboxes inside it) survive logout and are available on the next login.
+
+---
+
 ## Terminal Behaviour
 
 ### "no job control" warning
@@ -374,7 +413,7 @@ sandbox-ctl membership add --user alice --groups devs
 sandbox-ctl user list
 sandbox-ctl group list
 
-# 7. Enter the sandbox
+# 7. Enter the sandbox (inside host tmux for persistence)
 sandbox-ctl user run --user alice
 
 # 8. Remove a user when done
