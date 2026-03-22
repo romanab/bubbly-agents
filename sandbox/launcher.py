@@ -282,7 +282,7 @@ def generate_launcher(
             "\n"
             '"${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
             + bwrap_flags
-            + f"  {sandbox_init}{resolv_redir}{fd_redirects}{heredoc_bodies} &\n"
+            + f"  {sandbox_init}{resolv_redir}{fd_redirects} &{heredoc_bodies}\n"
             "BWRAP_PID=$!\n"
             'echo "$BWRAP_PID" > "$PID_FILE"\n'
             "\n"
