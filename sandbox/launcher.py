@@ -186,7 +186,7 @@ def generate_launcher(
         "  --unshare-user \\\n"
         f"  --uid {internal_uid} \\\n"
         f"  --gid {internal_gid} \\\n"
-        "  --unshare-pid --unshare-ipc --unshare-uts --unshare-cgroup \\\n"
+        "  --unshare-ipc --unshare-uts --unshare-cgroup \\\n"
         f"{unshare_net_line}"
         "  --proc /proc \\\n"
         "  --dev /dev \\\n"

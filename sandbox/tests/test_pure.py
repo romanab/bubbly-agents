@@ -294,6 +294,15 @@ class TestLauncher:
         with pytest.raises(ValueError, match="USER_HOME"):
             generate_launcher(launcher_dir, state_dir, "testuser")
 
+    def test_launcher_no_unshare_pid(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        cfg = _make_cfg()
+        self._write_state(state_dir, "testuser", cfg)
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "--unshare-pid" not in content
+
     def test_launcher_has_unshare_user(self, tmp_path):
         state_dir = tmp_path / "state"
         launcher_dir = tmp_path / "launchers"
