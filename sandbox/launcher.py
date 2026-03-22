@@ -30,6 +30,7 @@ _JOBCTL_SCRIPT = (
     "  for _e in /proc/[0-9]*/environ; do\n"
     '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$_ppid" ] && continue\n'
+    '    [ -r "$_e" ] || continue\n'
     '    tr "\\0" "\\n" < "$_e" 2>/dev/null | grep -Fxq "HOME=$HOME" || continue\n'
     '    _st=$(sed "s/.*) //" "/proc/$_pid/stat" 2>/dev/null | cut -d" " -f1)\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
@@ -42,7 +43,7 @@ _JOBCTL_SCRIPT = (
     "_jkill() {\n"
     '  _pid="$1"; _sig="${2:-TERM}"\n'
     '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
-    '  tr "\\0" "\\n" < "/proc/$_pid/environ" 2>/dev/null | grep -Fxq "HOME=$HOME" \\\n'
+    '  { [ -r "/proc/$_pid/environ" ] && tr "\\0" "\\n" < "/proc/$_pid/environ" 2>/dev/null | grep -Fxq "HOME=$HOME"; } \\\n'
     '    || { echo "Error: PID $_pid is not a job in this sandbox" >&2; return 1; }\n'
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
@@ -51,6 +52,7 @@ _JOBCTL_SCRIPT = (
     "  for _e in /proc/[0-9]*/environ; do\n"
     '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$_ppid" ] && continue\n'
+    '    [ -r "$_e" ] || continue\n'
     '    tr "\\0" "\\n" < "$_e" 2>/dev/null | grep -Fxq "HOME=$HOME" || continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
     "    _count=$((_count+1))\n"
