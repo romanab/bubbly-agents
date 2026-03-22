@@ -70,7 +70,7 @@ show_virtual_env() {
 export -f show_virtual_env
 PS1='$(show_virtual_env)'$PS1
 
-# Alert on login if tmux sessions are running
+# tmux session check on login
 if [[ -z "${TMUX}" && "${-}" == *i* ]] && command -v tmux >/dev/null 2>&1; then
     _tmux_sessions=$(tmux ls 2>/dev/null) || true
     if [[ -n "${_tmux_sessions}" ]]; then
@@ -88,6 +88,10 @@ if [[ -z "${TMUX}" && "${-}" == *i* ]] && command -v tmux >/dev/null 2>&1; then
             [[ -n "${_tmux_reply}" ]] && exec tmux attach -t "${_tmux_reply}"
         fi
         unset _tmux_sessions _tmux_count _tmux_name _tmux_reply
+    else
+        read -r -p "No tmux sessions running. Start one? [Y/n]: " _tmux_reply
+        [[ "${_tmux_reply,,}" != "n" ]] && exec tmux new-session -s sandboxes
+        unset _tmux_reply
     fi
 fi
 ```
