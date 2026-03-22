@@ -41,14 +41,16 @@ class UsersPane(Widget):
     def _reload(self) -> None:
         if self._cfg is None:
             return
-        from sandbox.users import list_users
+        from sandbox.users import list_users, list_running_usernames
         table = self.query_one(DataTable)
         table.clear(columns=True)
-        table.add_columns("USER", "PROFILE", "SUPP GROUPS")
+        table.add_columns("USER", "PROFILE", "SUPP GROUPS", "RUNNING")
         try:
+            running = list_running_usernames(self._cfg)
             for u in list_users(self._cfg):
                 supp = ", ".join(u.get("supp_groups", []))
-                table.add_row(u["username"], u.get("profile") or "", supp)
+                indicator = "●" if u["username"] in running else ""
+                table.add_row(u["username"], u.get("profile") or "", supp, indicator)
         except Exception as e:
             self.notify(f"Failed to load users: {e}", severity="error")
 

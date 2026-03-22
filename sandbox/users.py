@@ -220,3 +220,33 @@ def list_users(cfg: SandboxConfig) -> list[dict]:
         })
 
     return users
+
+
+def list_running_usernames(cfg: SandboxConfig) -> set[str]:
+    """Return the set of usernames that have a running bwrap process.
+
+    Scans /proc once and checks each process's cmdline for the user's
+    home directory path, which bwrap receives as a --bind argument.
+    """
+    managed = {u["username"] for u in list_users(cfg)}
+    if not managed:
+        return set()
+
+    running: set[str] = set()
+    proc = Path("/proc")
+    try:
+        pids = [p for p in proc.iterdir() if p.name.isdigit()]
+    except OSError:
+        return set()
+
+    for pid_path in pids:
+        try:
+            raw = (pid_path / "cmdline").read_bytes()
+        except OSError:
+            continue
+        cmdline = raw.replace(b"\x00", b" ").decode(errors="replace")
+        for username in managed - running:
+            if str(cfg.homes_dir / username) in cmdline:
+                running.add(username)
+
+    return running
