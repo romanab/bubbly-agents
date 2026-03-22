@@ -23,8 +23,8 @@ def _make_mount_group_script(groups_dir: str) -> str:
 
 _JOBCTL_SCRIPT = (
     "#!/bin/sh\n"
-    # Read own UID from procfs so comparison is consistent regardless of namespace translation
-    "_me=$(awk '/^Uid:/{print $2; exit}' /proc/self/status 2>/dev/null)\n"
+    # grep+cut: no awk dependency, works with minimal PATH
+    "_me=$(grep '^Uid:' /proc/self/status 2>/dev/null | cut -f2)\n"
     "_jlist() {\n"
     "  _found=0\n"
     '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
@@ -33,11 +33,11 @@ _JOBCTL_SCRIPT = (
     '    _pid="${_s%/status}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$PPID" ] && continue\n'
     '    [ "$_pid" = "$$" ] && continue\n'
-    '    _uid=$(awk \'/^Uid:/{print $2; exit}\' "$_s" 2>/dev/null)\n'
-    '    [ "$_uid" = "$_me" ] || continue\n'
+    '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
+    '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
     '    [ -z "$_cmd" ] && continue\n'
-    '    _st=$(awk \'/^State:/{print $2; exit}\' "$_s" 2>/dev/null)\n'
+    '    _st=$(grep "^State:" "$_s" 2>/dev/null | cut -f2 | cut -c1)\n'
     '    printf "%-8s %-1s  %s\\n" "$_pid" "${_st:-?}" "$_cmd"\n'
     "    _found=1\n"
     "  done\n"
@@ -46,8 +46,8 @@ _JOBCTL_SCRIPT = (
     "_jkill() {\n"
     '  _pid="$1"; _sig="${2:-TERM}"\n'
     '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
-    '  _uid=$(awk \'/^Uid:/{print $2; exit}\' "/proc/$_pid/status" 2>/dev/null)\n'
-    '  [ "$_uid" = "$_me" ] \\\n'
+    '  _uid=$(grep "^Uid:" "/proc/$_pid/status" 2>/dev/null | cut -f2)\n'
+    '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] \\\n'
     '    || { echo "Error: PID $_pid is not your process" >&2; return 1; }\n'
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
@@ -57,8 +57,8 @@ _JOBCTL_SCRIPT = (
     '    _pid="${_s%/status}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$PPID" ] && continue\n'
     '    [ "$_pid" = "$$" ] && continue\n'
-    '    _uid=$(awk \'/^Uid:/{print $2; exit}\' "$_s" 2>/dev/null)\n'
-    '    [ "$_uid" = "$_me" ] || continue\n'
+    '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
+    '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
