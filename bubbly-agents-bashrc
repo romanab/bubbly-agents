@@ -47,7 +47,7 @@ _bubbly_tmux_check() {
         fi
     else
         read -r -p "No tmux sessions running. Start one? [Y/n]: " _reply
-        [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes
+        [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes -c ~/projects/sandboxed-user-account/bubbly-agents
     fi
 }
 PROMPT_COMMAND="_bubbly_tmux_check${PROMPT_COMMAND:+; ${PROMPT_COMMAND}}"
