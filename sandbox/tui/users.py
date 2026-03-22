@@ -23,6 +23,7 @@ class UsersPane(Widget):
         Binding("d", "delete_user", "Delete"),
         Binding("i", "install", "Install"),
         Binding("m", "membership", "Member"),
+        Binding("l", "login", "Login"),
     ]
 
     def __init__(self, **kwargs) -> None:
@@ -201,6 +202,13 @@ class UsersPane(Widget):
             MembershipScreen(self._cfg, username, current_groups, all_groups),
             self._on_mutate,
         )
+
+    def action_login(self) -> None:
+        username = self._selected_username()
+        if not username:
+            self.notify("No user selected", severity="warning")
+            return
+        self.app.exit(username)
 
     def _on_mutate(self, result: bool) -> None:
         if result:

@@ -84,8 +84,15 @@ class SandboxApp(App):
 
 
 def main() -> None:
+    import os
     app = SandboxApp()
-    app.run()
+    result = app.run()
+    if isinstance(result, str):
+        launcher = app._cfg.launcher_dir / f"bwrap-shell-{result}"
+        if not launcher.exists():
+            print(f"Error: launcher not found for user '{result}'.")
+            raise SystemExit(1)
+        os.execv(str(launcher), [str(launcher)])
 
 
 if __name__ == "__main__":
