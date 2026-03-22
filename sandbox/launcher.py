@@ -44,8 +44,12 @@ _JOBCTL_SCRIPT = (
     '  [ "$_found" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     "_jkill() {\n"
-    '  _arg="$1"; _sig="${2:-TERM}"\n'
-    '  [ -z "$_arg" ] && { echo "Usage: jobctl kill <%N|pid> [signal]" >&2; return 1; }\n'
+    '  _sig="TERM"\n'
+    '  case "${1:-}" in\n'
+    '    -*) _sig="${1#-}"; shift ;;\n'
+    '  esac\n'
+    '  _arg="${1:-}"\n'
+    '  [ -z "$_arg" ] && { echo "Usage: jobctl kill [-sig] <%N|pid>" >&2; return 1; }\n'
     '  case "$_arg" in\n'
     '    %*)\n'
     '      _n="${_arg#%}"\n'
@@ -73,13 +77,13 @@ _JOBCTL_SCRIPT = (
     "}\n"
     'case "${1:-list}" in\n'
     '  list)    _jlist ;;\n'
-    '  kill)    _jkill "$2" "$3" ;;\n'
+    '  kill)    shift; _jkill "$@" ;;\n'
     '  killall) _jkillall ;;\n'
     '  help|-h|--help)\n'
     '    echo "Usage: jobctl [list|kill <pid> [sig]|killall]"\n'
     '    echo "  list     List background jobs for this sandbox user (default)"\n'
-    '    echo "  kill %N  Signal job N by number (default: TERM)"\n'
-    '    echo "  kill pid Signal by PID"\n'
+    '    echo "  kill [-sig] %N   Signal job N (e.g. kill -KILL %1)"\n'
+    '    echo "  kill [-sig] pid  Signal by PID"\n'
     '    echo "  killall  SIGTERM all listed background jobs"\n'
     "    ;;\n"
     '  *) echo "Unknown command: $1" >&2; exit 1 ;;\n'
