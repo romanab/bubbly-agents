@@ -52,51 +52,14 @@ brew install uv direnv
 
 #### All subsequent steps run from the `agents` account.
 
-Login to the `agents` account and add the following to `~/.bashrc`:
+Login to the `agents` account and hook the project's shell config into `~/.bashrc`. After cloning (step 4), run:
 
 ```bash
-# Homebrew
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-
-# direnv (auto-activates .venv when entering the project directory)
-eval "$(direnv hook bash)"
-
-# Show active venv in prompt when direnv is managing it
-show_virtual_env() {
-  if [[ -n "$VIRTUAL_ENV" && -n "$DIRENV_DIR" ]]; then
-    echo "($(basename $VIRTUAL_ENV))"
-  fi
-}
-export -f show_virtual_env
-PS1='$(show_virtual_env)'$PS1
-
-# tmux session check on login
-if [[ -z "${TMUX}" && "${-}" == *i* ]] && command -v tmux >/dev/null 2>&1; then
-    _tmux_sessions=$(tmux ls 2>/dev/null) || true
-    if [[ -n "${_tmux_sessions}" ]]; then
-        echo ""
-        echo "Running tmux sessions:"
-        echo "${_tmux_sessions}"
-        echo ""
-        _tmux_count=$(echo "${_tmux_sessions}" | wc -l)
-        if [[ ${_tmux_count} -eq 1 ]]; then
-            _tmux_name=$(echo "${_tmux_sessions}" | cut -d: -f1)
-            read -r -p "Attach to '${_tmux_name}'? [Y/n]: " _tmux_reply
-            [[ "${_tmux_reply,,}" != "n" ]] && exec tmux attach -t "${_tmux_name}"
-        else
-            read -r -p "Attach to session (name, or Enter to skip): " _tmux_reply
-            [[ -n "${_tmux_reply}" ]] && exec tmux attach -t "${_tmux_reply}"
-        fi
-        unset _tmux_sessions _tmux_count _tmux_name _tmux_reply
-    else
-        read -r -p "No tmux sessions running. Start one? [Y/n]: " _tmux_reply
-        [[ "${_tmux_reply,,}" != "n" ]] && exec tmux new-session -s sandboxes
-        unset _tmux_reply
-    fi
-fi
+echo 'source ~/bubbly-agents/bubbly-agents-bashrc' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-Then reload: `source ~/.bashrc`
+`bubbly-agents-bashrc` sets up Homebrew, direnv, a venv prompt indicator, and a tmux session check on every login (offers to attach to an existing session, or start a new one if none are running).
 
 #### 4. Clone the project and install
 
