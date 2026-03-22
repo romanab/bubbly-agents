@@ -3,7 +3,7 @@
 #   echo 'source ~/bubbly-agents/bubbly-agents-bashrc' >> ~/.bashrc
 
 # Start in project directory
-cd ~/projects/sandboxed-user-account/bubbly-agents 2>/dev/null || true
+cd ~/bubbly-agents 2>/dev/null || true
 
 # Homebrew
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
@@ -47,7 +47,7 @@ _bubbly_tmux_check() {
         fi
     else
         read -r -p "No tmux sessions running. Start one? [Y/n]: " _reply
-        [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes -c ~/projects/sandboxed-user-account/bubbly-agents
+        [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes -c ~/bubbly-agents
     fi
 }
 PROMPT_COMMAND="_bubbly_tmux_check${PROMPT_COMMAND:+; ${PROMPT_COMMAND}}"

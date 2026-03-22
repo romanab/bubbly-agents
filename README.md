@@ -59,7 +59,7 @@ echo 'source ~/bubbly-agents/bubbly-agents-bashrc' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-> Adjust the path if you cloned elsewhere (e.g. `~/projects/sandboxed-user-account/bubbly-agents/bubbly-agents-bashrc`). Also update the `cd` line near the top of `bubbly-agents-bashrc` to match your clone location.
+> If you cloned to a different path, update the `source` line and the `cd` line near the top of `bubbly-agents-bashrc` to match.
 
 `bubbly-agents-bashrc` sets up Homebrew, direnv, a venv prompt indicator, and a tmux session check on every login (offers to attach to an existing session, or start a new one if none are running).
 
