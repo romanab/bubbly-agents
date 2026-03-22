@@ -261,6 +261,7 @@ class CreateUserScreen(ModalScreen[bool]):
             yield Checkbox("No /usr in sandbox", id="no-usr")
             yield Checkbox("Mount /etc and /run read-only (sys-dirs)", id="sys-dirs")
             yield Checkbox("Fake sudo shim (exec wrapper, no privilege gain)", id="fake-sudo")
+            yield Checkbox("Persistent (keep running after terminal closes)", id="persistent")
             yield Label("Network:")
             with RadioSet(id="network"):
                 yield RadioButton("Full", value=True)
@@ -344,6 +345,7 @@ class CreateUserScreen(ModalScreen[bool]):
             comment=self.query_one("#comment", Input).value.strip(),
             extra_groups=extra_groups,
             fake_sudo=self.query_one("#fake-sudo", Checkbox).value,
+            persistent=self.query_one("#persistent", Checkbox).value,
             extra_paths=list(self._extra_paths),
         )
 
