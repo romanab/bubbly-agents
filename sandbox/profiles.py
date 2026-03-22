@@ -64,7 +64,6 @@ def load_profile(profiles_dir: Path, name: str) -> Profile:
         comment=user_kv.get("comment", ""),
         extra_groups=[g.strip() for g in user_kv.get("extra_groups", "").split(",") if g.strip()],
         fake_sudo=_parse_bool(user_kv.get("fake_sudo", "0")),
-        persistent=_parse_bool(user_kv.get("persistent", "0")),
     )
 
     # [sandbox]
@@ -185,8 +184,6 @@ def write_profile(profiles_dir: Path, profile_name: str, profile: "Profile") -> 
         lines.append(f"extra-groups = {','.join(user.extra_groups)}")
     if user.fake_sudo:
         lines.append("fake-sudo = true")
-    if user.persistent:
-        lines.append("persistent = true")
     lines.append("")
 
     # [shadow]

@@ -95,7 +95,6 @@ class UsersPane(Widget):
         lines.append(f"  /usr:       {'excluded' if base.get('NO_USR') == '1' else 'included'}")
         lines.append(f"  /etc+/run:  {'full ro-bind' if base.get('SYS_DIRS') == '1' else 'minimal'}")
         lines.append(f"  Fake sudo:  {'yes' if base.get('FAKE_SUDO') == '1' else 'no'}")
-        lines.append(f"  Persistent: {'yes' if base.get('PERSISTENT') == '1' else 'no'}")
         for label, key in [("Max procs", "MAX_PROCS"), ("Max fsize", "MAX_FSIZE"),
                            ("Max nofile", "MAX_NOFILE"), ("Cgroup mem", "CGROUP_MEM"),
                            ("Cgroup cpu", "CGROUP_CPU")]:

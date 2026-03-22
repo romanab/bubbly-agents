@@ -36,21 +36,6 @@ _UNMOUNT_GROUP_SCRIPT = (
     'rm "$LINK" && echo "Unmounted ~/$GROUP"\n'
 )
 
-_SANDBOX_STOP_SCRIPT = (
-    "#!/bin/sh\n"
-    'echo "Running sandbox processes:"\n'
-    'ps aux 2>/dev/null | tail -n +2 | grep -v \'sleep infinity\\|sandbox-stop\\|ps aux\'\n'
-    'printf "Kill all processes and stop sandbox? [y/N] "\n'
-    'read -r _answer\n'
-    'case "$_answer" in\n'
-    '    y|Y)\n'
-    '        tmux -S /tmp/tmux-sock/main kill-server 2>/dev/null || true\n'
-    '        kill -TERM 1\n'
-    '        ;;\n'
-    '    *)  echo "Cancelled." ;;\n'
-    'esac\n'
-)
-
 
 def generate_launcher(
     launcher_dir: Path,
@@ -73,7 +58,6 @@ def generate_launcher(
     no_usr = base.get("NO_USR", "0") == "1"
     sys_dirs = base.get("SYS_DIRS", "0") == "1"
     fake_sudo = base.get("FAKE_SUDO", "0") == "1"
-    persistent = base.get("PERSISTENT", "0") == "1"
     user_home = base.get("USER_HOME", "")
     if not user_home:
         raise ValueError(f"USER_HOME is not set in base state for user '{username}'")
@@ -84,11 +68,6 @@ def generate_launcher(
     max_nofile = base.get("MAX_NOFILE", "")
     cgroup_mem = base.get("CGROUP_MEM", "")
     cgroup_cpu = base.get("CGROUP_CPU", "")
-
-    # Paths used in persistent mode
-    state_user_dir = state_dir / username
-    tmux_sock_dir = state_user_dir / "tmux-sock"
-    pid_file = state_user_dir / "run.pid"
 
     # Detect group mounts — user has group scripts only when /usr is present
     groups_dir = state_dir.parent / "groups"
@@ -172,7 +151,7 @@ def generate_launcher(
         heredoc_bodies += f"\n{passwd_content}_PASSWD"
         heredoc_bodies += f"\n{group_content}_GROUP"
 
-    need_local_bin = (fake_sudo or has_groups or persistent) and not no_usr
+    need_local_bin = (fake_sudo or has_groups) and not no_usr
     if need_local_bin:
         local_bin_lines = "  --tmpfs /usr/local/bin \\\n"
 
@@ -199,24 +178,9 @@ def generate_launcher(
             heredoc_bodies += f"\n{mount_group_script}_MOUNT_GROUP"
             heredoc_bodies += f"\n{_UNMOUNT_GROUP_SCRIPT}_UNMOUNT_GROUP"
 
-        if persistent:
-            stop_fd_num = next_fd
-            next_fd += 1
-            local_bin_lines += f"  --file {stop_fd_num} /usr/local/bin/sandbox-stop \\\n"
-            local_bin_lines += "  --chmod 0755 /usr/local/bin/sandbox-stop \\\n"
-            fd_redirects += f" {stop_fd_num}<<'_SANDBOX_STOP'"
-            heredoc_bodies += f"\n{_SANDBOX_STOP_SCRIPT}_SANDBOX_STOP"
 
-    # tmux socket bind-mount (persistent only)
-    tmux_bind_lines = ""
-    if persistent:
-        tmux_bind_lines = (
-            f"  --bind {shlex.quote(str(tmux_sock_dir))} /tmp/tmux-sock \\\n"
-            "  --setenv TMUX_TMPDIR /tmp/tmux-sock \\\n"
-        )
-
-    # Build the bwrap flags block (shared between interactive and persistent paths)
-    session_flag = "  --new-session --die-with-parent \\\n" if not persistent else "  --new-session \\\n"
+    # Build the bwrap flags block
+    session_flag = "  --new-session --die-with-parent \\\n"
 
     bwrap_flags = (
         "  --unshare-user \\\n"
@@ -239,66 +203,21 @@ def generate_launcher(
         "  --ro-bind-try /lib32 /lib32 \\\n"
         "  --ro-bind-try /libx32 /libx32 \\\n"
         f"{usr_bind_line}"
-        f"{tmux_bind_lines}"
         f"{local_bin_lines}"
         f"{etc_run_lines}"
         '  "${EXTRA_MOUNT_ARGS[@]+"${EXTRA_MOUNT_ARGS[@]}"}" \\\n'
     )
 
     # Build final command block
-    if not persistent:
-        if network == "loopback":
-            bwrap_cmd = f"  /bin/bash -c 'ip link set lo up 2>/dev/null || true; exec /bin/bash --login'"
-        else:
-            bwrap_cmd = "  /bin/bash --login"
-        final_cmd = (
-            'exec "${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
-            + bwrap_flags
-            + f"{bwrap_cmd}{resolv_redir}{fd_redirects}{heredoc_bodies}\n"
-        )
+    if network == "loopback":
+        bwrap_cmd = f"  /bin/bash -c 'ip link set lo up 2>/dev/null || true; exec /bin/bash --login'"
     else:
-        # Persistent mode: check PID file, start in background, attach via tmux
-        quoted_sock_dir = shlex.quote(str(tmux_sock_dir))
-        quoted_pid_file = shlex.quote(str(pid_file))
-        if network == "loopback":
-            sandbox_init = "/bin/bash -c 'ip link set lo up 2>/dev/null || true; tmux -S /tmp/tmux-sock/main new-session -d -s main 2>/dev/null || true; exec sleep infinity'"
-        else:
-            sandbox_init = "/bin/bash -c 'tmux -S /tmp/tmux-sock/main new-session -d -s main 2>/dev/null || true; exec sleep infinity'"
-        final_cmd = (
-            f"TMUX_SOCK_DIR={quoted_sock_dir}\n"
-            f"PID_FILE={quoted_pid_file}\n"
-            'TMUX_SOCKET="${TMUX_SOCK_DIR}/main"\n'
-            "\n"
-            'if [[ -f "$PID_FILE" ]]; then\n'
-            '    _stored_pid=$(cat "$PID_FILE")\n'
-            '    if kill -0 "$_stored_pid" 2>/dev/null; then\n'
-            '        exec tmux -S "$TMUX_SOCKET" attach -t main\n'
-            "    else\n"
-            '        rm -f "$PID_FILE"\n'
-            "    fi\n"
-            "fi\n"
-            "\n"
-            'mkdir -p "$TMUX_SOCK_DIR"\n'
-            "\n"
-            '"${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
-            + bwrap_flags
-            + f"  {sandbox_init}{resolv_redir}{fd_redirects} &{heredoc_bodies}\n"
-            "BWRAP_PID=$!\n"
-            'echo "$BWRAP_PID" > "$PID_FILE"\n'
-            "\n"
-            "_waited=0\n"
-            'while [[ ! -S "$TMUX_SOCKET" && $_waited -lt 20 ]]; do\n'
-            "    sleep 0.1\n"
-            "    _waited=$(( _waited + 1 ))\n"
-            "done\n"
-            'if [[ ! -S "$TMUX_SOCKET" ]]; then\n'
-            '    echo "sandbox: tmux socket did not appear" >&2\n'
-            '    rm -f "$PID_FILE"\n'
-            "    exit 1\n"
-            "fi\n"
-            "\n"
-            'exec tmux -S "$TMUX_SOCKET" attach -t main\n'
-        )
+        bwrap_cmd = "  /bin/bash --login"
+    final_cmd = (
+        'exec "${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
+        + bwrap_flags
+        + f"{bwrap_cmd}{resolv_redir}{fd_redirects}{heredoc_bodies}\n"
+    )
 
     script = (
         "#!/usr/bin/env bash\n"
