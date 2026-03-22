@@ -68,6 +68,33 @@ def user_create(ctx, user, extra_groups, comment, no_usr, sys_dirs, fake_sudo,
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
+@user_group.command('audit')
+@click.option('--user', required=True, help='Username to inspect')
+@click.pass_context
+def user_audit(ctx, user):
+    """Inspect a sandbox user: paths, presence, and running processes."""
+    cfg = ctx.obj['cfg']
+    try:
+        from sandbox.users import audit_user
+        audit = audit_user(cfg, user)
+        click.echo(f"\nAudit for user '{user}':")
+        click.echo(f"  Home:       {audit['actual_home']} ({'present' if audit['home_present'] else 'missing'})")
+        click.echo(f"  Launcher:   {audit['launcher']} ({'present' if audit['launcher_present'] else 'missing'})")
+        click.echo(f"  Container:  {audit['user_container']} ({'present' if audit['user_container_present'] else 'missing'})")
+        if audit['home_size']:
+            click.echo(f"  Home size:  {audit['home_size']}")
+        if audit['supp_groups']:
+            click.echo(f"  Groups:     {', '.join(audit['supp_groups'])}")
+        if audit['running_pids']:
+            pids_str = ' '.join(str(p) for p in sorted(audit['running_pids']))
+            click.echo(f"  Running:    {len(audit['running_pids'])} process(es) — PIDs: {pids_str}")
+        else:
+            click.echo(f"  Running:    none")
+    except (SandboxError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 @user_group.command('delete')
 @click.option('--user', required=True, help='Username to delete')
 @click.option('--keep-home', is_flag=True, help='Keep home directory')
