@@ -27,21 +27,44 @@ _JOBCTL_SCRIPT = (
     # The host can read /proc/<pid>/environ without ptrace restrictions; the sandbox cannot.
     "_PIDS_FILE=$HOME/.jobctl_pids\n"
     "_me=$(grep '^Uid:' /proc/self/status 2>/dev/null | cut -f2)\n"
+    # Enumerate alive jobs: file-based (cross-session) first, then current-session
+    # children of the calling shell. Calls back with: _job_cb N PID CMD ST
+    "_each_job() {\n"
+    "  _n=0\n"
+    '  if [ -s "$_PIDS_FILE" ]; then\n'
+    '    while IFS= read -r _p; do\n'
+    '      [ -z "$_p" ] && continue\n'
+    '      _c=$(tr "\\0" " " < "/proc/$_p/cmdline" 2>/dev/null | cut -c1-60)\n'
+    '      [ -z "$_c" ] && continue\n'
+    '      _t=$(grep "^State:" "/proc/$_p/status" 2>/dev/null | cut -f2 | cut -c1)\n'
+    '      _n=$((_n+1)); _job_cb "$_n" "$_p" "$_c" "${_t:-?}"\n'
+    '    done < "$_PIDS_FILE"\n'
+    '  fi\n'
+    '  for _s in /proc/[0-9]*/status; do\n'
+    '    _p="${_s%/status}"; _p="${_p##*/proc/}"\n'
+    '    [ "$_p" = "$$" ] && continue\n'
+    '    grep -qxF "$_p" "$_PIDS_FILE" 2>/dev/null && continue\n'
+    '    _pp=$(grep "^PPid:" "$_s" 2>/dev/null | cut -f2)\n'
+    '    [ "$_pp" = "$PPID" ] || continue\n'
+    '    _c=$(tr "\\0" " " < "/proc/$_p/cmdline" 2>/dev/null | cut -c1-60)\n'
+    '    [ -z "$_c" ] && continue\n'
+    '    _t=$(grep "^State:" "$_s" 2>/dev/null | cut -f2 | cut -c1)\n'
+    '    _n=$((_n+1)); _job_cb "$_n" "$_p" "$_c" "${_t:-?}"\n'
+    '  done\n'
+    "}\n"
     "_jlist() {\n"
-    "  _found=0; _n=0\n"
     '  printf "[N]  %-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
     '  printf -- "---  --------  -  -------\\n"\n'
-    '  [ -s "$_PIDS_FILE" ] || { echo "No background jobs."; return; }\n'
-    '  while IFS= read -r _pid; do\n'
-    '    [ -z "$_pid" ] && continue\n'
-    '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
-    '    [ -z "$_cmd" ] && continue\n'
-    '    _st=$(grep "^State:" "/proc/$_pid/status" 2>/dev/null | cut -f2 | cut -c1)\n'
-    '    _n=$((_n+1))\n'
-    '    printf "[%s]  %-8s %-1s  %s\\n" "$_n" "$_pid" "${_st:-?}" "$_cmd"\n'
-    "    _found=1\n"
-    '  done < "$_PIDS_FILE"\n'
+    '  _found=0\n'
+    '  _job_cb() { printf "[%s]  %-8s %-1s  %s\\n" "$1" "$2" "$4" "$3"; _found=1; }\n'
+    '  _each_job\n'
     '  [ "$_found" -eq 0 ] && echo "No background jobs."\n'
+    "}\n"
+    "_nth_job() {\n"
+    '  _target="$1"; _result=""\n'
+    '  _job_cb() { [ "$1" = "$_target" ] && _result="$2"; }\n'
+    '  _each_job\n'
+    '  echo "$_result"\n'
     "}\n"
     "_jkill() {\n"
     '  _sig="TERM"\n'
@@ -53,7 +76,7 @@ _JOBCTL_SCRIPT = (
     '  case "$_arg" in\n'
     '    %*)\n'
     '      _n="${_arg#%}"\n'
-    '      _pid=$(sed -n "${_n}p" "$_PIDS_FILE" 2>/dev/null)\n'
+    '      _pid=$(_nth_job "$_n")\n'
     '      [ -z "$_pid" ] && { echo "Error: no job %$_n" >&2; return 1; }\n'
     '      ;;\n'
     '    *) _pid="$_arg" ;;\n'
@@ -64,15 +87,12 @@ _JOBCTL_SCRIPT = (
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
     "_jkillall() {\n"
-    "  _count=0\n"
-    '  [ -s "$_PIDS_FILE" ] || { echo "No background jobs."; return; }\n'
-    '  while IFS= read -r _pid; do\n'
-    '    [ -z "$_pid" ] && continue\n'
-    '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null)\n'
-    '    [ -z "$_cmd" ] && continue\n'
-    '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
-    "    _count=$((_count+1))\n"
-    '  done < "$_PIDS_FILE"\n'
+    '  _count=0\n'
+    '  _job_cb() {\n'
+    '    kill -TERM "$2" 2>/dev/null && echo "Sent SIGTERM to $2"\n'
+    '    _count=$((_count+1))\n'
+    '  }\n'
+    '  _each_job\n'
     '  [ "$_count" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     'case "${1:-list}" in\n'
