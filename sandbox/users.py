@@ -241,6 +241,12 @@ def list_running_usernames(cfg: SandboxConfig) -> set[str]:
 
     for pid_path in pids:
         try:
+            exe_name = (pid_path / "exe").resolve().name
+        except OSError:
+            continue
+        if exe_name != "bwrap":
+            continue
+        try:
             raw = (pid_path / "cmdline").read_bytes()
         except OSError:
             continue
