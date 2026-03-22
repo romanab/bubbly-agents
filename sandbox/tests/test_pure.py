@@ -302,7 +302,7 @@ class TestLauncher:
         self._write_state(users_dir, "testuser", cfg)
         content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
         assert "/usr/local/bin/jobctl" in content
-        assert "grep '^Uid:'" in content or "grep \"^Uid:\"" in content
+        assert ".jobctl_pids" in content
 
     def test_launcher_no_jobctl_when_no_usr(self, tmp_path):
         users_dir = tmp_path / "users"

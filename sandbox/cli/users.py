@@ -213,5 +213,7 @@ def user_run(ctx, user):
     if not launcher.exists():
         click.echo(f"Error: launcher not found for user '{user}'. Run 'user create' first.", err=True)
         sys.exit(1)
+    from sandbox.users import write_jobctl_pids
+    write_jobctl_pids(cfg, user)
     os.execv(str(launcher), [str(launcher)])
 

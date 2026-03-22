@@ -338,3 +338,18 @@ def list_running_pids(cfg: SandboxConfig) -> dict[str, list[int]]:
 def list_running_usernames(cfg: SandboxConfig) -> set[str]:
     """Return the set of usernames that have running processes."""
     return set(list_running_pids(cfg).keys())
+
+
+def write_jobctl_pids(cfg: SandboxConfig, username: str) -> None:
+    """Write current PIDs for username to $HOME/.jobctl_pids.
+
+    Called by user_run and the TUI launcher before exec'ing the bwrap
+    launcher.  Inside the sandbox, jobctl reads this file — the host
+    side can read /proc/<pid>/environ freely; the sandbox cannot.
+    """
+    pids = list_running_pids(cfg).get(username, [])
+    pids_file = cfg.user_home(username) / ".jobctl_pids"
+    try:
+        pids_file.write_text("".join(f"{p}\n" for p in pids))
+    except OSError:
+        pass

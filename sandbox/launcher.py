@@ -23,57 +23,43 @@ def _make_mount_group_script(groups_dir: str) -> str:
 
 _JOBCTL_SCRIPT = (
     "#!/bin/sh\n"
-    # grep+cut: no awk dependency, works with minimal PATH
+    # PIDs written by the host launcher (sandbox-ctl user run / TUI) before exec'ing bwrap.
+    # The host can read /proc/<pid>/environ without ptrace restrictions; the sandbox cannot.
+    "_PIDS_FILE=$HOME/.jobctl_pids\n"
     "_me=$(grep '^Uid:' /proc/self/status 2>/dev/null | cut -f2)\n"
-    # Processes in the initial user namespace are host processes (bash, tmux, systemd…).
-    # Sandbox background jobs live in a bwrap user namespace — a different inode.
-    # readlink /proc/<pid>/ns/user is world-accessible (no ptrace needed).
-    "_init_ns=$(readlink /proc/1/ns/user 2>/dev/null)\n"
-    "_in_sandbox() {\n"
-    '  _ns=$(readlink "/proc/$1/ns/user" 2>/dev/null)\n'
-    '  [ -n "$_ns" ] && [ "$_ns" != "$_init_ns" ]\n'
-    "}\n"
     "_jlist() {\n"
     "  _found=0\n"
     '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
     '  printf -- "--------  -  -------\\n"\n'
-    "  for _s in /proc/[0-9]*/status; do\n"
-    '    _pid="${_s%/status}"; _pid="${_pid##*/proc/}"\n'
-    '    [ "$_pid" = "$PPID" ] && continue\n'
-    '    [ "$_pid" = "$$" ] && continue\n'
-    '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
-    '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
-    '    _in_sandbox "$_pid" || continue\n'
+    '  [ -s "$_PIDS_FILE" ] || { echo "No background jobs."; return; }\n'
+    '  while IFS= read -r _pid; do\n'
+    '    [ -z "$_pid" ] && continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
     '    [ -z "$_cmd" ] && continue\n'
-    '    _st=$(grep "^State:" "$_s" 2>/dev/null | cut -f2 | cut -c1)\n'
+    '    _st=$(grep "^State:" "/proc/$_pid/status" 2>/dev/null | cut -f2 | cut -c1)\n'
     '    printf "%-8s %-1s  %s\\n" "$_pid" "${_st:-?}" "$_cmd"\n'
     "    _found=1\n"
-    "  done\n"
+    '  done < "$_PIDS_FILE"\n'
     '  [ "$_found" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     "_jkill() {\n"
     '  _pid="$1"; _sig="${2:-TERM}"\n'
     '  [ -z "$_pid" ] && { echo "Usage: jobctl kill <pid> [signal]" >&2; return 1; }\n'
     '  _uid=$(grep "^Uid:" "/proc/$_pid/status" 2>/dev/null | cut -f2)\n'
-    '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] && _in_sandbox "$_pid" \\\n'
-    '    || { echo "Error: PID $_pid is not a sandbox job" >&2; return 1; }\n'
+    '  [ -n "$_uid" ] && [ "$_uid" = "$_me" ] \\\n'
+    '    || { echo "Error: PID $_pid is not your process" >&2; return 1; }\n'
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
     "_jkillall() {\n"
     "  _count=0\n"
-    "  for _s in /proc/[0-9]*/status; do\n"
-    '    _pid="${_s%/status}"; _pid="${_pid##*/proc/}"\n'
-    '    [ "$_pid" = "$PPID" ] && continue\n'
-    '    [ "$_pid" = "$$" ] && continue\n'
-    '    _uid=$(grep "^Uid:" "$_s" 2>/dev/null | cut -f2)\n'
-    '    [ -n "$_uid" ] && [ "$_uid" = "$_me" ] || continue\n'
-    '    _in_sandbox "$_pid" || continue\n'
+    '  [ -s "$_PIDS_FILE" ] || { echo "No background jobs."; return; }\n'
+    '  while IFS= read -r _pid; do\n'
+    '    [ -z "$_pid" ] && continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
     "    _count=$((_count+1))\n"
-    "  done\n"
+    '  done < "$_PIDS_FILE"\n'
     '  [ "$_count" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     'case "${1:-list}" in\n'
@@ -82,9 +68,9 @@ _JOBCTL_SCRIPT = (
     '  killall) _jkillall ;;\n'
     '  help|-h|--help)\n'
     '    echo "Usage: jobctl [list|kill <pid> [sig]|killall]"\n'
-    '    echo "  list     List all your processes (default)"\n'
+    '    echo "  list     List background jobs for this sandbox user (default)"\n'
     '    echo "  kill N   Signal PID N (default: TERM)"\n'
-    '    echo "  killall  SIGTERM all your background processes"\n'
+    '    echo "  killall  SIGTERM all listed background jobs"\n'
     "    ;;\n"
     '  *) echo "Unknown command: $1" >&2; exit 1 ;;\n'
     "esac\n"

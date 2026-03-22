@@ -92,6 +92,8 @@ def main() -> None:
         if not launcher.exists():
             print(f"Error: launcher not found for user '{result}'.")
             raise SystemExit(1)
+        from sandbox.users import write_jobctl_pids
+        write_jobctl_pids(app._cfg, result)
         os.execv(str(launcher), [str(launcher)])
 
 
