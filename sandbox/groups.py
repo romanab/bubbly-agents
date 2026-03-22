@@ -161,8 +161,8 @@ def delete_group(cfg: SandboxConfig, name: str, dry_run: bool = False) -> None:
     # Remove bind mounts and regenerate launchers for each member
     for member in audit["members"]:
         if is_managed_user(cfg, member):
-            remove_group_bind_mount(cfg.state_dir, member, group_dir, dry_run)
-            generate_launcher(cfg.launcher_dir, cfg.state_dir, member, dry_run)
+            remove_group_bind_mount(cfg.users_dir, member, group_dir, dry_run)
+            generate_launcher(cfg.launcher_dir, cfg.users_dir, member, dry_run)
 
     # Remove entire container (gid, members, shared dir)
     if container_dir.exists():

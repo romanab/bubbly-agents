@@ -32,10 +32,13 @@ class SandboxConfig:
     project_root: Path
     data_dir: Path       # low_priv_user_dirs/
     launcher_dir: Path
-    state_dir: Path
-    homes_dir: Path
+    users_dir: Path      # users/<username>/ containers (replaces state_dir + homes_dir)
     groups_dir: Path
     scripts_dir: Path
+
+    def user_home(self, username: str) -> Path:
+        """Return the home directory path for a user inside their container."""
+        return self.users_dir / username / f"{username}.home"
 
 
 def load_config() -> SandboxConfig:
@@ -52,8 +55,7 @@ def load_config() -> SandboxConfig:
         project_root=project_root,
         data_dir=data_dir,
         launcher_dir=data_dir / "launchers",
-        state_dir=data_dir / "state",
-        homes_dir=data_dir / "homes",
+        users_dir=data_dir / "users",
         groups_dir=data_dir / "groups",
         scripts_dir=project_root / "scripts",
     )

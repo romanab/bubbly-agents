@@ -77,7 +77,7 @@ def install_binary(
         raise SandboxError(f"binary is not executable: {binary}")
 
     # 2. Determine sandbox-root
-    sandbox_root = cfg.homes_dir / username / "sandbox-root"
+    sandbox_root = cfg.user_home(username) / "sandbox-root"
 
     # 3. Collect ldd deps
     deps = collect_ldd_deps(binary)
@@ -112,7 +112,7 @@ def install_binary(
         new_mounts.append(_stage(dep, dep.as_posix()))
 
     # 7-8. Merge with existing mounts (deduplicate by source+dest) and write back
-    existing = read_extra_mounts(cfg.state_dir, username)
+    existing = read_extra_mounts(cfg.users_dir, username)
 
     seen: set[tuple[str, str]] = {(m.source, m.dest) for m in existing}
     merged = list(existing)
@@ -127,6 +127,6 @@ def install_binary(
             print(f"[dry-run] would register mount: {m.kind} {m.source} {m.dest}")
         print(f"[dry-run] would regenerate launcher for {username}")
     else:
-        write_extra_mounts(cfg.state_dir, username, merged)
-        generate_launcher(cfg.launcher_dir, cfg.state_dir, username)
+        write_extra_mounts(cfg.users_dir, username, merged)
+        generate_launcher(cfg.launcher_dir, cfg.users_dir, username)
 

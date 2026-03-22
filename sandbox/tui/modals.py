@@ -376,12 +376,12 @@ class CreateUserScreen(ModalScreen[bool]):
         from sandbox.state import read_extra_mounts, write_extra_mounts
         from sandbox.models import MountEntry
         from sandbox.launcher import generate_launcher
-        existing = read_extra_mounts(self._cfg.state_dir, username)
+        existing = read_extra_mounts(self._cfg.users_dir, username)
         seen = {(m.source, m.dest) for m in existing}
         new = [MountEntry("--ro-bind", p, p) for p in self._extra_paths if (p, p) not in seen]
         if new:
-            write_extra_mounts(self._cfg.state_dir, username, existing + new)
-            generate_launcher(self._cfg.launcher_dir, self._cfg.state_dir, username)
+            write_extra_mounts(self._cfg.users_dir, username, existing + new)
+            generate_launcher(self._cfg.launcher_dir, self._cfg.users_dir, username)
 
     @on(Button.Pressed, "#create")
     def create(self) -> None:

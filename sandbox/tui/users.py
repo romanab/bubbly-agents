@@ -70,12 +70,12 @@ class UsersPane(Widget):
             return
         from sandbox.state import read_base, read_extra_mounts, read_profile_name
         from sandbox.tui.modals import OutputScreen
-        base = read_base(self._cfg.state_dir, username)
-        mounts = read_extra_mounts(self._cfg.state_dir, username)
-        profile_name = read_profile_name(self._cfg.state_dir, username)
+        base = read_base(self._cfg.users_dir, username)
+        mounts = read_extra_mounts(self._cfg.users_dir, username)
+        profile_name = read_profile_name(self._cfg.users_dir, username)
 
         # Categorise mounts
-        sandbox_root = str(self._cfg.homes_dir / username / "sandbox-root")
+        sandbox_root = str(self._cfg.user_home(username) / "sandbox-root")
         groups_dir = str(self._cfg.groups_dir)
         installed, group_mounts, extra = [], [], []
         for m in mounts:
@@ -153,7 +153,7 @@ class UsersPane(Widget):
         lines = [f"Audit for user '{username}':"]
         lines.append(f"  Home:       {audit['actual_home']} ({'present' if audit['home_present'] else 'missing'})")
         lines.append(f"  Launcher:   {audit['launcher']} ({'present' if audit['launcher_present'] else 'missing'})")
-        lines.append(f"  State dir:  {audit['state_dir']} ({'present' if audit['state_dir_present'] else 'missing'})")
+        lines.append(f"  Container:  {audit['user_container']} ({'present' if audit['user_container_present'] else 'missing'})")
         if audit["supp_groups"]:
             lines.append(f"  Groups:     {', '.join(audit['supp_groups'])}")
         if audit["private_group"]:
