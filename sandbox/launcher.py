@@ -291,6 +291,8 @@ def generate_launcher(
         '  --bind "${USER_HOME}" "${USER_HOME}" \\\n'
         '  --setenv HOME "${USER_HOME}" \\\n'
         '  --chdir "${USER_HOME}" \\\n'
+        f"  --setenv PS1 '({username}@\\w:\\s-\\v)\\$ ' \\\n"
+        f"  --setenv PROMPT_COMMAND '[ -n \"$TMUX\" ] && printf \"\\033k%s\\033\\\\\" \"{username}\"' \\\n"
         '  --hostname "${BWRAP_HOSTNAME}" \\\n'
         f"{session_flag}"
         "  --ro-bind-try /bin /bin \\\n"
