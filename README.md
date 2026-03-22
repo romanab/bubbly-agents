@@ -228,7 +228,6 @@ description = Human-readable description
 [user]
 comment     = GECOS comment for the account
 no-usr      = false    # Omit /usr from the sandbox
-sys-dirs    = false    # Mount host /etc and /run read-only (breaks username resolution — avoid)
 fake-sudo   = false    # Inject a no-privilege sudo shim
 network     = full     # full | loopback | none  (default: full)
 # max-procs  =         # Max processes (ulimit -u)
