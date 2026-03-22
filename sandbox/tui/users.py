@@ -210,6 +210,14 @@ class UsersPane(Widget):
         if not username:
             self.notify("No user selected", severity="warning")
             return
+        from sandbox.users import list_running_usernames
+        if username in list_running_usernames(self._cfg):
+            self.notify(
+                f"'{username}' is already running — switch to its tmux window to re-attach",
+                severity="warning",
+                timeout=6,
+            )
+            return
         self.app.exit(username)
 
     def _on_mutate(self, result: bool) -> None:
