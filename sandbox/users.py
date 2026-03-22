@@ -114,12 +114,31 @@ def audit_user(cfg: SandboxConfig, username: str) -> dict:
             if parts:
                 home_size = parts[0]
 
+    # Detect running bwrap PIDs for this user
+    running_pids = []
+    home_str = str(actual_home)
+    proc = Path("/proc")
+    try:
+        for pid_path in proc.iterdir():
+            if not pid_path.name.isdigit():
+                continue
+            try:
+                if (pid_path / "exe").resolve().name != "bwrap":
+                    continue
+                raw = (pid_path / "cmdline").read_bytes()
+                if home_str.encode() in raw:
+                    running_pids.append(int(pid_path.name))
+            except OSError:
+                continue
+    except OSError:
+        pass
+
     return {
         "username": username,
         "home": actual_home,
         "launcher": launcher,
         "state_dir": state_dir,
-        "running_pids": [],
+        "running_pids": running_pids,
         "launcher_present": launcher.exists(),
         "shells_present": False,
         "state_dir_present": state_dir.exists(),
@@ -146,11 +165,18 @@ def delete_user(
     # 2. Audit
     audit = audit_user(cfg, username)
 
-    # 3. Check running pids
-    if audit["running_pids"] and not force:
-        raise SandboxError(
-            f"User {username!r} has running processes {audit['running_pids']}; use force=True to override"
-        )
+    # 3. Kill running bwrap processes
+    if audit["running_pids"]:
+        if not force:
+            raise SandboxError(
+                f"User {username!r} has running processes {audit['running_pids']}; use force=True to override"
+            )
+        import signal
+        for pid in audit["running_pids"]:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
 
     launcher = audit["launcher"]
     actual_home = audit["actual_home"]
