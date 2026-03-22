@@ -30,7 +30,7 @@ _JOBCTL_SCRIPT = (
     "  for _e in /proc/[0-9]*/environ; do\n"
     '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$_ppid" ] && continue\n'
-    '    (exec 2>/dev/null; tr "\\0" "\\n" < "$_e") | grep -Fxq "HOME=$HOME" || continue\n'
+    '    cat "$_e" 2>/dev/null | tr "\\0" "\\n" | grep -Fxq "HOME=$HOME" || continue\n'
     '    _st=$(sed "s/.*) //" "/proc/$_pid/stat" 2>/dev/null | cut -d" " -f1)\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null | cut -c1-60)\n'
     '    [ -z "$_cmd" ] && _cmd="[$_pid]"\n'
@@ -51,7 +51,7 @@ _JOBCTL_SCRIPT = (
     "  for _e in /proc/[0-9]*/environ; do\n"
     '    _pid="${_e%/environ}"; _pid="${_pid##*/proc/}"\n'
     '    [ "$_pid" = "$_ppid" ] && continue\n'
-    '    (exec 2>/dev/null; tr "\\0" "\\n" < "$_e") | grep -Fxq "HOME=$HOME" || continue\n'
+    '    cat "$_e" 2>/dev/null | tr "\\0" "\\n" | grep -Fxq "HOME=$HOME" || continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
     "    _count=$((_count+1))\n"
     "  done\n"
