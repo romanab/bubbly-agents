@@ -82,7 +82,7 @@ uv pip install -e .
 sandbox-ctl group create --group devs
 
 # Create a user in that group
-sandbox-ctl user create --user alice --sys-dirs --extra-groups devs
+sandbox-ctl user create --user alice --extra-groups devs
 
 # Launch the sandbox
 sandbox-ctl user run --user alice
@@ -118,7 +118,7 @@ sandbox-ctl user install --sandbox NAME --binary PATH [--dest PATH] [--dry-run]
 | `--extra-path PATH` | Expose a host directory read-only inside the sandbox (repeatable). |
 | `--comment TEXT` | GECOS comment (stored in synthetic /etc/passwd). |
 | `--no-usr` | Omit `/usr` from the sandbox. |
-| `--sys-dirs` | Mount `/etc` and `/run` read-only (needed for NSS, DNS). |
+| `--sys-dirs` | Mount host `/etc` and `/run` read-only. **Avoid for normal use** — breaks username resolution inside the sandbox because the host `/etc/passwd` has no sandbox users. Use only when full host NSS is required. DNS and basic `/etc` files work without this flag. |
 | `--fake-sudo` | Inject a `sudo` shim that execs the command directly (no privilege gain). |
 | `--network full\|loopback\|none` | Network mode (default: `full`). |
 | `--max-procs N` | Max processes (ulimit -u). |
@@ -228,7 +228,7 @@ description = Human-readable description
 [user]
 comment     = GECOS comment for the account
 no-usr      = false    # Omit /usr from the sandbox
-sys-dirs    = false    # Mount /etc and /run read-only
+sys-dirs    = false    # Mount host /etc and /run read-only (breaks username resolution — avoid)
 fake-sudo   = false    # Inject a no-privilege sudo shim
 network     = full     # full | loopback | none  (default: full)
 # max-procs  =         # Max processes (ulimit -u)
@@ -365,7 +365,7 @@ tmux creates its own pseudo-terminals via `/dev/ptmx` and manages its own sessio
 sandbox-ctl group create --group devs
 
 # 2. Create a user in that group
-sandbox-ctl user create --user alice --sys-dirs --extra-groups devs
+sandbox-ctl user create --user alice --extra-groups devs
 
 # 3. Or from a profile
 sandbox-ctl user profile --profile devtools --user alice
