@@ -356,6 +356,8 @@ def generate_launcher(
         "    fi\n"
         "fi\n"
         "\n"
+        + f'[ -n "${{TMUX:-}}" ] && tmux rename-window {shlex.quote(username)} 2>/dev/null || true\n'
+        + "\n"
         + (
             "ETC_FILES=(\n"
             "  hosts shells\n"
