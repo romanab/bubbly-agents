@@ -23,8 +23,8 @@ def _make_mount_group_script(groups_dir: str) -> str:
 
 _JOBCTL_SCRIPT = (
     "#!/bin/sh\n"
-    # UID as seen inside the sandbox (namespace-translated); /proc/*/status is world-readable
-    "_me=$(id -u)\n"
+    # Read own UID from procfs so comparison is consistent regardless of namespace translation
+    "_me=$(awk '/^Uid:/{print $2; exit}' /proc/self/status 2>/dev/null)\n"
     "_jlist() {\n"
     "  _found=0\n"
     '  printf "%-8s %-1s  %s\\n" "PID" "S" "COMMAND"\n'
@@ -51,7 +51,6 @@ _JOBCTL_SCRIPT = (
     '    || { echo "Error: PID $_pid is not your process" >&2; return 1; }\n'
     '  kill -"$_sig" "$_pid" && echo "Sent SIG$_sig to $_pid"\n'
     "}\n"
-    # killall: only orphaned processes (PPid=1) to avoid killing live shells/tmux
     "_jkillall() {\n"
     "  _count=0\n"
     "  for _s in /proc/[0-9]*/status; do\n"
@@ -60,14 +59,12 @@ _JOBCTL_SCRIPT = (
     '    [ "$_pid" = "$$" ] && continue\n'
     '    _uid=$(awk \'/^Uid:/{print $2; exit}\' "$_s" 2>/dev/null)\n'
     '    [ "$_uid" = "$_me" ] || continue\n'
-    '    _ppid=$(awk \'/^PPid:/{print $2; exit}\' "$_s" 2>/dev/null)\n'
-    '    [ "$_ppid" = "1" ] || continue\n'
     '    _cmd=$(tr "\\0" " " < "/proc/$_pid/cmdline" 2>/dev/null)\n'
     '    [ -z "$_cmd" ] && continue\n'
     '    kill -TERM "$_pid" 2>/dev/null && echo "Sent SIGTERM to $_pid"\n'
     "    _count=$((_count+1))\n"
     "  done\n"
-    '  [ "$_count" -eq 0 ] && echo "No orphaned background jobs."\n'
+    '  [ "$_count" -eq 0 ] && echo "No background jobs."\n'
     "}\n"
     'case "${1:-list}" in\n'
     '  list)    _jlist ;;\n'
@@ -77,7 +74,7 @@ _JOBCTL_SCRIPT = (
     '    echo "Usage: jobctl [list|kill <pid> [sig]|killall]"\n'
     '    echo "  list     List all your processes (default)"\n'
     '    echo "  kill N   Signal PID N (default: TERM)"\n'
-    '    echo "  killall  SIGTERM orphaned background processes"\n'
+    '    echo "  killall  SIGTERM all your background processes"\n'
     "    ;;\n"
     '  *) echo "Unknown command: $1" >&2; exit 1 ;;\n'
     "esac\n"
