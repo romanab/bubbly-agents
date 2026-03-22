@@ -114,19 +114,17 @@ def audit_user(cfg: SandboxConfig, username: str) -> dict:
             if parts:
                 home_size = parts[0]
 
-    # Detect running bwrap PIDs for this user
+    # Detect running PIDs for this user via HOME= in /proc/<pid>/environ
     running_pids = []
-    home_str = str(actual_home)
+    home_marker = f"HOME={actual_home}".encode()
     proc = Path("/proc")
     try:
         for pid_path in proc.iterdir():
             if not pid_path.name.isdigit():
                 continue
             try:
-                if (pid_path / "exe").resolve().name != "bwrap":
-                    continue
-                raw = (pid_path / "cmdline").read_bytes()
-                if home_str.encode() in raw:
+                raw = (pid_path / "environ").read_bytes()
+                if home_marker in raw:
                     running_pids.append(int(pid_path.name))
             except OSError:
                 continue
@@ -249,10 +247,11 @@ def list_users(cfg: SandboxConfig) -> list[dict]:
 
 
 def list_running_usernames(cfg: SandboxConfig) -> set[str]:
-    """Return the set of usernames that have a running bwrap process.
+    """Return the set of usernames that have running processes.
 
-    Scans /proc once and checks each process's cmdline for the user's
-    home directory path, which bwrap receives as a --bind argument.
+    Scans /proc once and checks each process's environment for
+    HOME=<user_home>, which is set by bwrap and inherited by all
+    child processes including orphaned background jobs after exit.
     """
     managed = {u["username"] for u in list_users(cfg)}
     if not managed:
@@ -267,18 +266,11 @@ def list_running_usernames(cfg: SandboxConfig) -> set[str]:
 
     for pid_path in pids:
         try:
-            exe_name = (pid_path / "exe").resolve().name
+            raw = (pid_path / "environ").read_bytes()
         except OSError:
             continue
-        if exe_name != "bwrap":
-            continue
-        try:
-            raw = (pid_path / "cmdline").read_bytes()
-        except OSError:
-            continue
-        cmdline = raw.replace(b"\x00", b" ").decode(errors="replace")
         for username in managed - running:
-            if str(cfg.homes_dir / username) in cmdline:
+            if f"HOME={cfg.homes_dir / username}".encode() in raw:
                 running.add(username)
 
     return running
