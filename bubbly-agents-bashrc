@@ -29,15 +29,15 @@ if [[ -z "${TMUX}" && "${-}" == *i* ]] && command -v tmux >/dev/null 2>&1; then
         if [[ ${_tmux_count} -eq 1 ]]; then
             _tmux_name=$(echo "${_tmux_sessions}" | cut -d: -f1)
             read -r -p "Attach to '${_tmux_name}'? [Y/n]: " _tmux_reply
-            [[ "${_tmux_reply,,}" != "n" ]] && exec tmux attach -t "${_tmux_name}"
+            [[ "${_tmux_reply,,}" != "n" ]] && tmux attach -t "${_tmux_name}"
         else
             read -r -p "Attach to session (name, or Enter to skip): " _tmux_reply
-            [[ -n "${_tmux_reply}" ]] && exec tmux attach -t "${_tmux_reply}"
+            [[ -n "${_tmux_reply}" ]] && tmux attach -t "${_tmux_reply}"
         fi
         unset _tmux_sessions _tmux_count _tmux_name _tmux_reply
     else
         read -r -p "No tmux sessions running. Start one? [Y/n]: " _tmux_reply
-        [[ "${_tmux_reply,,}" != "n" ]] && exec tmux new-session -s sandboxes
+        [[ "${_tmux_reply,,}" != "n" ]] && tmux new-session -s sandboxes
         unset _tmux_reply
     fi
 fi
