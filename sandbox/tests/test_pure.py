@@ -64,6 +64,13 @@ class TestState:
         assert data["MAX_NOFILE"] == "1024"
         assert data["CGROUP_MEM"] == "512M"
         assert data["CGROUP_CPU"] == "50%"
+        assert data["PERSISTENT"] == "0"
+
+    def test_write_base_persistent_flag(self, tmp_path):
+        cfg = _make_cfg(persistent=True)
+        write_base(tmp_path, "testuser", cfg, Path("/home/testuser"))
+        data = read_base(tmp_path, "testuser")
+        assert data["PERSISTENT"] == "1"
 
     def test_write_base_default_hostname(self, tmp_path):
         cfg = _make_cfg()  # hostname=""
@@ -366,6 +373,86 @@ class TestLauncher:
         content = path.read_text()
         assert "mygrp:x:1042:" in content
 
+    # --- persistent mode tests ---
+
+    def test_non_persistent_has_die_with_parent(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=False))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "--die-with-parent" in content
+
+    def test_persistent_omits_die_with_parent(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "--die-with-parent" not in content
+
+    def test_persistent_has_tmux_bind_mount(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "/tmp/tmux-sock" in content
+        assert "TMUX_TMPDIR" in content
+
+    def test_non_persistent_no_tmux_bind(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=False))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "tmux-sock" not in content
+
+    def test_persistent_injects_sandbox_stop(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "/usr/local/bin/sandbox-stop" in content
+        assert "kill -TERM 1" in content
+
+    def test_persistent_no_usr_omits_sandbox_stop(self, tmp_path):
+        """With no_usr=True there is no /usr/local/bin; sandbox-stop must not be injected."""
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True, no_usr=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "sandbox-stop" not in content
+
+    def test_persistent_has_pid_file_check(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "run.pid" in content
+        assert "kill -0" in content
+
+    def test_persistent_has_background_bwrap(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "new-session -d" in content
+        assert "sleep infinity" in content
+
+    def test_persistent_uses_exec_tmux_attach(self, tmp_path):
+        state_dir = tmp_path / "state"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(state_dir, "testuser", _make_cfg(persistent=True))
+        content = generate_launcher(launcher_dir, state_dir, "testuser").read_text()
+        assert "exec tmux" in content
+        assert "attach -t main" in content
+
 
 # ---------------------------------------------------------------------------
 # TestIds
@@ -447,6 +534,8 @@ class TestModels:
         assert cfg.cgroup_cpu == ""
         assert cfg.comment == ""
         assert cfg.extra_groups == []
+        assert cfg.fake_sudo is False
+        assert cfg.persistent is False
 
     def test_userconfig_extra_groups_independent(self):
         # Ensure default_factory gives independent lists per instance

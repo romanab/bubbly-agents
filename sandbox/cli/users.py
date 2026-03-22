@@ -30,6 +30,7 @@ def user_list(ctx):
 @click.option('--no-usr', is_flag=True, help='Omit /usr from sandbox')
 @click.option('--sys-dirs', is_flag=True, help='Mount /etc and /run read-only')
 @click.option('--fake-sudo', is_flag=True, help='Inject a sudo shim (exec wrapper, no privilege gain)')
+@click.option('--persistent', is_flag=True, help='Keep sandbox running after terminal closes (tmux-based re-attach)')
 @click.option('--network', default='full', type=click.Choice(['full','loopback','none']), help='Network mode')
 @click.option('--max-procs', default='', help='Max processes (ulimit -u)')
 @click.option('--max-fsize', default='', help='Max file size in MB (ulimit -f)')
@@ -39,8 +40,9 @@ def user_list(ctx):
 @click.option('--extra-path', multiple=True, help='Expose host directory read-only (repeatable)')
 @click.option('--dry-run', is_flag=True, help='Print actions without making changes')
 @click.pass_context
-def user_create(ctx, user, extra_groups, comment, no_usr, sys_dirs, fake_sudo, network,
-                max_procs, max_fsize, max_nofile, cgroup_mem, cgroup_cpu, extra_path, dry_run):
+def user_create(ctx, user, extra_groups, comment, no_usr, sys_dirs, fake_sudo, persistent,
+                network, max_procs, max_fsize, max_nofile, cgroup_mem, cgroup_cpu,
+                extra_path, dry_run):
     """Create a sandboxed system user."""
     cfg = ctx.obj['cfg']
     user_cfg = UserConfig(
@@ -48,6 +50,7 @@ def user_create(ctx, user, extra_groups, comment, no_usr, sys_dirs, fake_sudo, n
         no_usr=no_usr,
         sys_dirs=sys_dirs,
         fake_sudo=fake_sudo,
+        persistent=persistent,
         network=network,
         max_procs=max_procs,
         max_fsize=max_fsize,
@@ -168,3 +171,51 @@ def user_run(ctx, user):
         click.echo(f"Error: launcher not found for user '{user}'. Run 'user create' first.", err=True)
         sys.exit(1)
     os.execv(str(launcher), [str(launcher)])
+
+@user_group.command('stop')
+@click.option('--user', required=True, help='Username whose sandbox to stop')
+@click.pass_context
+def user_stop(ctx, user):
+    """Terminate a running persistent sandbox from the host."""
+    import os
+    import signal
+    import time
+    cfg = ctx.obj['cfg']
+    pid_file = cfg.state_dir / user / "run.pid"
+    if not pid_file.exists():
+        click.echo(f"No running sandbox found for '{user}' (no PID file).", err=True)
+        sys.exit(1)
+    try:
+        bwrap_pid = int(pid_file.read_text().strip())
+    except (ValueError, OSError) as e:
+        click.echo(f"Error reading PID file: {e}", err=True)
+        sys.exit(1)
+    try:
+        os.kill(bwrap_pid, 0)
+    except ProcessLookupError:
+        click.echo(f"PID {bwrap_pid} is not running. Removing stale PID file.")
+        pid_file.unlink(missing_ok=True)
+        return
+    except PermissionError:
+        pass  # process exists but we may still be able to signal it
+    try:
+        os.kill(bwrap_pid, signal.SIGTERM)
+    except OSError as e:
+        click.echo(f"Failed to send SIGTERM to {bwrap_pid}: {e}", err=True)
+        sys.exit(1)
+    click.echo(f"Sent SIGTERM to sandbox PID {bwrap_pid}. Waiting...")
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        time.sleep(0.2)
+        try:
+            os.kill(bwrap_pid, 0)
+        except ProcessLookupError:
+            pid_file.unlink(missing_ok=True)
+            click.echo(f"Sandbox '{user}' stopped.")
+            return
+    click.echo(
+        f"Warning: PID {bwrap_pid} did not exit within 5 seconds. "
+        f"Use 'kill -9 {bwrap_pid}' if needed.",
+        err=True,
+    )
+    sys.exit(1)

@@ -16,6 +16,7 @@ class UserConfig:
     comment: str = ""
     extra_groups: list[str] = field(default_factory=list)
     fake_sudo: bool = False
+    persistent: bool = False
     extra_paths: list[str] = field(default_factory=list)
 
 

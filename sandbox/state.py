@@ -82,6 +82,7 @@ def write_base(state_dir: Path, username: str, cfg: UserConfig, home: Path, dry_
         f"CGROUP_MEM={cfg.cgroup_mem}\n"
         f"CGROUP_CPU={cfg.cgroup_cpu}\n"
         f"FAKE_SUDO={1 if cfg.fake_sudo else 0}\n"
+        f"PERSISTENT={1 if cfg.persistent else 0}\n"
     )
     _write_secure(path, content, mode=0o600, dry_run=dry_run)
 
