@@ -17,13 +17,13 @@ Designed for giving untrusted or semi-trusted agents access to a machine without
 `sandbox-ctl user create` writes state files and generates a launcher script (`low_priv_user_dirs/launchers/bwrap-shell-<username>`). No OS user accounts are created. When run, the launcher executes `bwrap` to construct a private view of the filesystem:
 
 - `--unshare-user` creates a user namespace: the calling user's UID is mapped to a unique internal UID inside the sandbox, so `id` shows e.g. `uid=1001(alice) gid=1001(alice)`
-- Their home directory lives at `low_priv_user_dirs/homes/<username>/` on the host
+- Their home directory lives at `low_priv_user_dirs/users/<username>/<username>.home/` on the host
 - Synthetic `/etc/passwd` and `/etc/group` are injected via file descriptors — no real entries in host system files
 - `/usr`, `/lib*`, and other system paths can be included or excluded via profile flags
 - Additional host directories can be exposed read-only via `--extra-path`
 - Shared group directories are bind-mounted into members' sandboxes and accessible via `mount-group <group>` inside the sandbox
 
-Per-user configuration is stored in `low_priv_user_dirs/state/<username>/`. The entire runtime tree lives under `low_priv_user_dirs/` and moves with the project folder.
+Per-user configuration is stored in `low_priv_user_dirs/users/<username>/`. The entire runtime tree lives under `low_priv_user_dirs/` and moves with the project folder.
 
 ---
 
@@ -61,7 +61,7 @@ source ~/.bashrc
 
 > If you cloned to a different path, update the `source` line and the `cd` line near the top of `bubbly-agents-bashrc` to match.
 
-`bubbly-agents-bashrc` sets up Homebrew, direnv, a venv prompt indicator, and a tmux session check on every login (offers to attach to an existing session, or start a new one if none are running).
+`bubbly-agents-bashrc` sets up Homebrew, direnv, a venv prompt indicator, and automatic tmux session management on every login: if a session is already running it attaches to it; if not it creates a new one named `sandboxes`. The admin account is designed to have at most one tmux session at a time.
 
 #### 4. Clone the project and install
 
@@ -132,6 +132,8 @@ sandbox-ctl user install --sandbox NAME --binary PATH [--dest PATH] [--dry-run]
 | `--cgroup-cpu PCT` | CPU quota (e.g. `50%`). |
 | `--dry-run` | Print actions only; make no changes. |
 
+`user regen` regenerates the bwrap launcher for an existing user, picking up any changes to launcher scripts or configuration. Run this after updating bubbly-agents to get new injected tools (e.g. `jobctl`).
+
 #### `sandbox-ctl group`
 
 ```
@@ -157,7 +159,7 @@ sandbox-ctl membership remove --user NAME --groups csv [--dry-run]
 | `SANDBOX_DATA_DIR` | `<project>/low_priv_user_dirs` |
 | `SANDBOX_PROJECT_ROOT` | directory containing `pyproject.toml` |
 
-All derived paths (`launchers/`, `state/`, `homes/`, `groups/`) are resolved from `SANDBOX_DATA_DIR`.
+All derived paths (`launchers/`, `users/`, `groups/`) are resolved from `SANDBOX_DATA_DIR`.
 
 ---
 
@@ -182,9 +184,13 @@ All derived paths (`launchers/`, `state/`, `homes/`, `groups/`) are resolved fro
   profiles/                    Profile templates
   low_priv_user_dirs/          owner: calling user
     launchers/                 bwrap-shell-<username> launcher scripts
-    state/                     <username>/{base,extra-mounts,ids,profile}
-    homes/                     sandbox home directories
-      <username>/              mode 0700
+    users/
+      <username>/              user container directory
+        ids                    internal UID and GID (one per line)
+        base                   config key=value pairs
+        extra-mounts           bind mount entries
+        profile                (optional) profile name
+        <username>.home/       sandbox home directory  mode 0700
     groups/                    shared group directories
       <groupname>/             container directory
         <groupname>.gid        internal GID
@@ -303,14 +309,62 @@ Members listed in a group can use `mount-group <name>` to access it. The `mount-
 
 ---
 
-## Keeping Sandboxes Alive Across Disconnections
+## Shell Experience
 
-Sandbox processes keep running as long as the bwrap launcher process is alive. The recommended approach is to run a single **host tmux session** under the `agents` account, with one window per sandbox:
+### Prompt
+
+The sandbox shell prompt shows the username, current directory, and bash version:
+
+```
+(alice@~/project:bash-5.1)$
+```
+
+### Tmux window titles
+
+- **Admin shell** (`agents` account): the tmux window is automatically named `agents@mercury` (or whatever `user@hostname` applies) on each prompt.
+- **Sandbox session**: when a sandbox is launched via `sandbox-ctl user run` or the TUI, the tmux window is renamed to the sandbox username (e.g. `alice`). When the sandbox exits, the admin shell's PROMPT_COMMAND resets the window name.
+
+### `jobctl` — background job manager
+
+`jobctl` is injected into `/usr/local/bin/jobctl` inside every sandbox (when `/usr` is present). It lists and signals background processes belonging to the current user:
 
 ```bash
-# Start (or name) the host tmux session
-tmux new-session -s sandboxes
+# List background jobs (also the default with no arguments)
+jobctl
+jobctl list
 
+# Kill job by number or PID
+jobctl kill %1
+jobctl kill -KILL %2
+jobctl kill 12345
+
+# Kill all listed jobs
+jobctl killall
+
+# Help
+jobctl help
+```
+
+Output format:
+
+```
+[N]  PID      S  COMMAND
+---  --------  -  -------
+[1]  20623    S  sleep 11111111111
+[2]  20624    S  sleep 222222222222
+```
+
+`jobctl` shows both jobs started in the current session (background processes whose parent is the calling shell) and cross-session orphaned jobs written to `~/.jobctl_pids` by the host at login time.
+
+---
+
+## Keeping Sandboxes Alive Across Disconnections
+
+Sandbox processes keep running as long as the bwrap launcher process is alive. The recommended approach is to run a single **host tmux session** under the `agents` account, with one window per sandbox.
+
+`bubbly-agents-bashrc` handles this automatically on login: it attaches to the existing session if one is running, or creates a new one named `sandboxes` if not. The admin account is intended to have at most one tmux session at a time.
+
+```bash
 # Open a window for each sandbox user
 sandbox-ctl user run --user alice    # window 1
 # Ctrl-B c  (new window)
@@ -319,12 +373,7 @@ sandbox-ctl user run --user agent1   # window 2
 # Detach: Ctrl-B d
 # All sandboxes keep running — bwrap is a child of the tmux server,
 # which stays alive after detach.
-
-# Reattach later (or via the auto-attach prompt on login):
-tmux attach -t sandboxes
 ```
-
-The `~/.bashrc` snippet in the Installation section detects running tmux sessions at login and offers to re-attach automatically.
 
 ### Surviving full account logout
 
@@ -350,7 +399,7 @@ bash: cannot set terminal process group: Inappropriate ioctl for device
 bash: no job control in this shell
 ```
 
-This is expected. The launcher passes `--new-session` to bwrap, which calls `setsid()` to create a new session for security (prevents sandbox escape via `TIOCSTI`). The downside is that bash starts without a controlling terminal, so job control (`Ctrl-Z`, `fg`, `bg`) is unavailable. All other shell functionality works normally.
+This is expected. The launcher passes `--new-session` to bwrap, which calls `setsid()` to create a new session for security (prevents sandbox escape via `TIOCSTI`). The downside is that bash starts without a controlling terminal, so job control (`Ctrl-Z`, `fg`, `bg`) is unavailable. Use `jobctl` to manage background processes instead.
 
 ### tmux works inside the sandbox
 
@@ -386,9 +435,12 @@ sandbox-ctl group list
 # 7. Enter the sandbox (inside host tmux for persistence)
 sandbox-ctl user run --user alice
 
-# 8. Remove a user when done
+# 8. Regenerate the launcher after updating bubbly-agents
+sandbox-ctl user regen --user alice
+
+# 9. Remove a user when done
 sandbox-ctl user delete --user alice
 
-# 9. Remove a group when done
+# 10. Remove a group when done
 sandbox-ctl group delete --group devs
 ```

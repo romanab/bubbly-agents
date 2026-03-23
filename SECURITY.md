@@ -12,10 +12,11 @@ No real OS user accounts are created. Isolation is provided entirely by bwrap bi
 |-----------|------|--------|
 | User | `--unshare-user` | Creates a user namespace; caller's UID maps to internal UID inside sandbox |
 | Mount | implicit | User sees only the bwrap-constructed filesystem view |
-| PID | `--unshare-pid` | User sees only their own processes |
 | IPC | `--unshare-ipc` | Isolated System V IPC and POSIX message queues |
 | UTS | `--unshare-uts` | Separate hostname (`sandbox-<user>` by default) |
 | Cgroup | `--unshare-cgroup` | Isolated cgroup view |
+
+PID namespace is **not** unshared. The sandbox sees host PIDs via `--proc /proc`. This is intentional: it enables `jobctl` (the in-sandbox background job manager) to identify the user's own processes via `/proc/<pid>/status` (world-readable), and allows the host to write `~/.jobctl_pids` at login for cross-session job tracking. The sandboxed user cannot read `/proc/<pid>/environ` for processes outside their user namespace (ptrace restriction), so they cannot inspect other users' environment variables.
 
 `--new-session` calls `setsid()`, preventing the sandbox from accessing the parent's controlling terminal. `--die-with-parent` ensures the sandbox exits if the managing process dies.
 
@@ -41,10 +42,10 @@ No real OS user accounts are created. Isolation is provided entirely by bwrap bi
 
 Sandbox users do not have real OS accounts. Isolation works as follows:
 
-- Each sandbox user is assigned a unique internal UID/GID (allocated from a local counter starting at 1001, stored in `state/<user>/ids`)
+- Each sandbox user is assigned a unique internal UID/GID (allocated from a local counter starting at 1001, stored in `users/<user>/ids`)
 - `--unshare-user --uid N --gid N` maps the calling user's real UID to UID N inside the sandbox; `id` inside shows e.g. `uid=1001(alice) gid=1001(alice)`
 - A synthetic `/etc/passwd` and `/etc/group` are injected via file descriptors; the real host `/etc/passwd` is never exposed unless `--sys-dirs` is used
-- Sandbox A cannot read sandbox B's home directory because only each user's own `homes/<user>/` is bind-mounted into their sandbox — not by Unix permissions, but by what bwrap exposes
+- Sandbox A cannot read sandbox B's home directory because only each user's own `users/<user>/<user>.home/` is bind-mounted into their sandbox — not by Unix permissions, but by what bwrap exposes
 
 Two different sandbox users running as the same real UID on the host (which is normal here — the host admin runs all sandboxes) are separated only by what bwrap bind-mounts. The launcher script controls which paths are visible.
 
@@ -56,10 +57,11 @@ Two different sandbox users running as the same real UID on the host (which is n
 
 ```
 low_priv_user_dirs/launchers/bwrap-shell-<user>   owner: admin user  755
-low_priv_user_dirs/state/<user>/                   owner: admin user  (755/600)
-low_priv_user_dirs/state/<user>/base               owner: admin user  600
-low_priv_user_dirs/state/<user>/extra-mounts       owner: admin user  600
-low_priv_user_dirs/state/<user>/ids                owner: admin user  600
+low_priv_user_dirs/users/<user>/                   owner: admin user  755
+low_priv_user_dirs/users/<user>/base               owner: admin user  600
+low_priv_user_dirs/users/<user>/extra-mounts       owner: admin user  600
+low_priv_user_dirs/users/<user>/ids                owner: admin user  600
+low_priv_user_dirs/users/<user>/<user>.home/       owner: admin user  700
 ```
 
 The `extra-mounts` file is critical: it contains the bwrap bind-mount arguments for the launcher. If a sandboxed user could write to `extra-mounts`, they could inject arbitrary bwrap flags (removing namespace flags, adding bind mounts) and escape the sandbox on next run.
@@ -70,7 +72,7 @@ Sandboxed users have no shell on the host (no OS account, no login shell), so th
 
 `sandbox-ctl` is owned by the host admin and runs without elevated privileges. If the host admin's account is compromised, an attacker can modify the launcher scripts or state files directly. This is inherent to any system where one user manages sandboxes for others.
 
-Sandboxed home directories (`low_priv_user_dirs/homes/<user>/`) are owned by the admin account and are not accessible to other sandboxed users.
+Sandboxed home directories (`low_priv_user_dirs/users/<user>/<user>.home/`) are owned by the admin account and are not accessible to other sandboxed users.
 
 ---
 
