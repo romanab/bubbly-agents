@@ -92,3 +92,29 @@ bwrap: execvp /home/linuxbrew/.linuxbrew: Permission denied
 **Fix:** `sandbox/launcher.py` now single-quotes all path values in `EXTRA_MOUNT_ARGS`.
 The TUI label and placeholder were also updated to clarify one path per entry.
 Fixed in commits `8014d08` and `bac5353`.
+
+## [CLOSED] Login shells did not source `.bashrc`
+
+**Symptom:** After logging into a restricted sandbox account (via the generated launcher
+`bwrap-shell-<username>`), customisations in `~/.bashrc` had no effect — PATH additions,
+aliases, the `on-enter` hook, etc.
+
+**Root cause:** The launcher invokes `/bin/bash --login`.  Bash login shells read
+`~/.bash_profile` (not `~/.bashrc`).  No `.bash_profile` was created in the sandbox
+home, so `.bashrc` was never sourced.
+
+**Fix:**
+- `sandbox/users.py` `create_user` now writes a minimal `~/.bash_profile` that sources
+  `~/.bashrc` when the home directory is first created.
+- `profiles/example/dotfiles/.bash_profile` added with the same content; listed in
+  `[dotfiles]` of `profiles/example/profile.conf` so profile-based users also get it.
+
+**Existing accounts** need a one-time fix — either re-apply the profile:
+```bash
+sandbox-ctl profile apply --user <username> --profile example
+```
+or write the file directly:
+```bash
+echo '[[ -f ~/.bashrc ]] && source ~/.bashrc' \
+  >> /path/to/users/<username>/<username>.home/.bash_profile
+```

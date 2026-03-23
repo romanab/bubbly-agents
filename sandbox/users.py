@@ -130,6 +130,14 @@ def create_user(cfg: SandboxConfig, user_cfg: UserConfig, dry_run: bool = False)
         print(f"[dry-run] would create home dir {user_home} mode=0o700")
     else:
         os.makedirs(user_home, mode=0o700, exist_ok=True)
+        # Write .bash_profile so login shells source .bashrc.
+        # bash --login reads .bash_profile, not .bashrc directly.
+        bash_profile = user_home / ".bash_profile"
+        if not bash_profile.exists():
+            bash_profile.write_text(
+                "# .bash_profile — sourced by bash login shells\n"
+                "[[ -f ~/.bashrc ]] && source ~/.bashrc\n"
+            )
 
     # 7. Generate launcher
     launcher_path = cfg.launcher_dir / f"bwrap-shell-{username}"
