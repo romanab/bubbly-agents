@@ -169,7 +169,7 @@ def generate_launcher(
     if mounts:
         mount_lines = []
         for m in mounts:
-            mount_lines.append(f"  {m.kind}\n  {m.source}\n  {m.dest}")
+            mount_lines.append(f"  {m.kind}\n  '{m.source}'\n  '{m.dest}'")
         extra_mount_args = "EXTRA_MOUNT_ARGS=(\n" + "\n".join(mount_lines) + "\n)\n"
     else:
         extra_mount_args = "EXTRA_MOUNT_ARGS=(\n)\n"
