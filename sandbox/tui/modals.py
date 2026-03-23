@@ -251,10 +251,10 @@ class CreateUserScreen(ModalScreen[bool]):
                         yield Checkbox(g, id=f"eg-{g}")
                 else:
                     yield Label("(no managed groups exist)")
-            yield Label("Extra host paths (exposed read-only):")
+            yield Label("Extra host paths — one path per entry (exposed read-only):")
             yield DataTable(id="paths-table", cursor_type="row")
             with Horizontal(classes="paths-row"):
-                yield Input(id="paths-input", placeholder="/home/linuxbrew/.linuxbrew")
+                yield Input(id="paths-input", placeholder="one path, e.g. /home/linuxbrew/.linuxbrew")
                 yield Button("Add", id="paths-add")
                 yield Button("Remove", id="paths-remove")
             yield Input(id="comment", placeholder="GECOS comment")
@@ -964,10 +964,10 @@ class CreateProfileScreen(ModalScreen[bool]):
                 yield Button("Add", id="dotfiles-add")
                 yield Button("Remove", id="dotfiles-remove")
 
-            yield Label("Extra host paths (exposed read-only in sandbox):")
+            yield Label("Extra host paths — one path per entry (exposed read-only in sandbox):")
             yield DataTable(id="paths-table", cursor_type="row", classes="list-table")
             with Horizontal(classes="list-row"):
-                yield Input(id="paths-input", placeholder="/home/linuxbrew/.linuxbrew")
+                yield Input(id="paths-input", placeholder="one path, e.g. /home/linuxbrew/.linuxbrew")
                 yield Button("Add", id="paths-add")
                 yield Button("Remove", id="paths-remove")
 
