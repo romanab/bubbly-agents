@@ -150,6 +150,53 @@ sandbox-ctl membership add    --user NAME --groups csv [--dry-run]
 sandbox-ctl membership remove --user NAME --groups csv [--dry-run]
 ```
 
+#### `sandbox-ctl exec`
+
+Run a command inside a sandbox without an interactive login. The spawned process
+survives the calling script exiting (the launcher omits `--die-with-parent` when
+given arguments).
+
+```
+sandbox-ctl exec run --user NAME -- CMD [ARGS...]
+sandbox-ctl exec run --user NAME --detach -- CMD [ARGS...]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--user NAME` | **Required.** Sandbox username. |
+| `--detach` | Fork and print the PID; return immediately. Process runs in background. |
+
+```bash
+# Run a command and wait (streams stdout/stderr, returns exit code)
+sandbox-ctl exec run --user agent1 -- python3 -c "print('hello')"
+
+# Fire and forget — prints PID, exits immediately
+sandbox-ctl exec run --user agent1 --detach -- python3 agent.py
+```
+
+#### `sandbox-ctl jobctl`
+
+Inspect and signal processes running under sandbox users from the host side.
+
+```
+sandbox-ctl jobctl list [--user NAME]
+sandbox-ctl jobctl kill --user NAME [--pid PID] [--sig SIGNAL]
+```
+
+```bash
+# List all running jobs across all sandboxes
+sandbox-ctl jobctl list
+
+# List jobs for a specific user
+sandbox-ctl jobctl list --user agent1
+
+# Send SIGTERM to all of a user's processes
+sandbox-ctl jobctl kill --user agent1
+
+# Send SIGKILL to a specific PID
+sandbox-ctl jobctl kill --user agent1 --pid 12345 --sig KILL
+```
+
 ### Configuration
 
 `sandbox-ctl` reads path configuration from environment variables:
@@ -358,6 +405,88 @@ Output format:
 
 ---
 
+## Orchestration
+
+The entire management surface is available as a Python API. Scripts running as the
+admin user can prepare environments, inject software, spawn processes, and manage
+their full lifecycle without ever opening an interactive shell.
+
+### Python API
+
+```python
+from sandbox.config import load_config
+from sandbox.users import create_user, list_users
+from sandbox.models import UserConfig
+from sandbox.installs import install_binary
+from sandbox.profiles import apply_profile
+from sandbox.membership import add_member
+from sandbox.exec import spawn_in_sandbox, run_in_sandbox
+from sandbox.jobctl import get_user_jobs, get_all_jobs, send_signal
+import signal
+from pathlib import Path
+
+cfg = load_config()
+
+# --- Environment management ---
+
+# Create a sandbox
+create_user(cfg, UserConfig(username="agent1", network="loopback", cgroup_mem="1G"))
+
+# Install a binary (copies binary + shared libraries into the sandbox)
+install_binary(cfg, "agent1", Path("/usr/bin/python3"))
+
+# Apply a profile template
+apply_profile(cfg, "devtools", "agent2")
+
+# Add to a shared group
+add_member(cfg, "agent1", "shared-data")
+
+# List all sandboxes
+for u in list_users(cfg):
+    print(u["username"], u["supp_groups"])
+
+# --- Process spawning ---
+
+# Spawn a background agent (non-blocking; survives this script exiting)
+proc = spawn_in_sandbox(cfg, "agent1", ["python3", "-u", "agent.py"])
+pid = proc.pid
+
+# Run a one-shot command and capture output
+result = run_in_sandbox(cfg, "agent1", ["python3", "-c", "print('ok')"],
+                        capture_output=True)
+assert result.stdout == b"ok\n"
+
+# Pass stdin input
+result = run_in_sandbox(cfg, "agent1", ["cat"], input=b"hello\n",
+                        capture_output=True)
+
+# --- Lifecycle management ---
+
+# Inspect running processes
+jobs = get_user_jobs(cfg, "agent1")   # [{pid, state, elapsed, command}, ...]
+all_jobs = get_all_jobs(cfg)          # same, across all users
+
+# Signal a specific PID
+send_signal(cfg, "agent1", signal.SIGTERM, pid=pid)
+
+# Signal all of a user's processes
+send_signal(cfg, "agent1", signal.SIGKILL)
+```
+
+### Exec mode vs interactive mode
+
+The launcher script detects whether it was given arguments:
+
+| Invocation | Mode | `--die-with-parent` | Command |
+|---|---|---|---|
+| `bwrap-shell-alice` | Interactive | Yes — shell cleaned up if terminal closes | `bash --login` |
+| `bwrap-shell-alice python3 agent.py` | Exec | No — process outlives the caller | `python3 agent.py` |
+
+`sandbox-ctl exec run` and `spawn_in_sandbox` use exec mode. `sandbox-ctl user run`
+and the TUI use interactive mode.
+
+---
+
 ## Keeping Sandboxes Alive Across Disconnections
 
 Sandbox processes keep running as long as the bwrap launcher process is alive. The recommended approach is to run a single **host tmux session** under the `agents` account, with one window per sandbox.
@@ -432,15 +561,22 @@ sandbox-ctl membership add --user alice --groups devs
 sandbox-ctl user list
 sandbox-ctl group list
 
-# 7. Enter the sandbox (inside host tmux for persistence)
+# 7. Enter the sandbox interactively (inside host tmux for persistence)
 sandbox-ctl user run --user alice
 
-# 8. Regenerate the launcher after updating bubbly-agents
+# 8. Or run a command non-interactively
+sandbox-ctl exec run --user alice -- python3 script.py
+
+# 9. Run a background agent and track it
+sandbox-ctl exec run --user alice --detach -- python3 agent.py
+sandbox-ctl jobctl list --user alice
+
+# 10. Regenerate the launcher after updating bubbly-agents
 sandbox-ctl user regen --user alice
 
-# 9. Remove a user when done
+# 11. Remove a user when done
 sandbox-ctl user delete --user alice
 
-# 10. Remove a group when done
+# 12. Remove a group when done
 sandbox-ctl group delete --group devs
 ```
