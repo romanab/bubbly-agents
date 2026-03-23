@@ -29,25 +29,10 @@ _bubbly_tmux_check() {
     [[ -n "${TMUX}" ]] && return
     command -v tmux >/dev/null 2>&1 || return
 
-    local _sessions _count _name _reply
-    _sessions=$(tmux ls 2>/dev/null) || true
-    if [[ -n "${_sessions}" ]]; then
-        echo ""
-        echo "Running tmux sessions:"
-        echo "${_sessions}"
-        echo ""
-        _count=$(echo "${_sessions}" | wc -l)
-        if [[ ${_count} -eq 1 ]]; then
-            _name=$(echo "${_sessions}" | cut -d: -f1)
-            read -r -p "Attach to '${_name}'? [Y/n]: " _reply
-            [[ "${_reply,,}" != "n" ]] && tmux attach -t "${_name}"
-        else
-            read -r -p "Attach to session (name, or Enter to skip): " _reply
-            [[ -n "${_reply}" ]] && tmux attach -t "${_reply}"
-        fi
+    if tmux ls >/dev/null 2>&1; then
+        tmux attach
     else
-        read -r -p "No tmux sessions running. Start one? [Y/n]: " _reply
-        [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes -c ~/bubbly-agents
+        tmux new-session -s sandboxes -c ~/bubbly-agents
     fi
 }
 _bubbly_tmux_title() {
