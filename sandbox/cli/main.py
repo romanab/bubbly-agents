@@ -13,10 +13,14 @@ def cli(ctx):
 from sandbox.cli.users import user_group
 from sandbox.cli.groups import group_group
 from sandbox.cli.membership import membership_group
+from sandbox.cli.exec import exec_group
+from sandbox.cli.jobctl import jobctl_group
 
 cli.add_command(user_group, name='user')
 cli.add_command(group_group, name='group')
 cli.add_command(membership_group, name='membership')
+cli.add_command(exec_group, name='exec')
+cli.add_command(jobctl_group, name='jobctl')
 
 if __name__ == '__main__':
     cli()

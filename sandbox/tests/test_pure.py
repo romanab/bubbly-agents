@@ -322,6 +322,26 @@ class TestLauncher:
         content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
         assert "--unshare-pid" not in content
 
+    def test_launcher_exec_mode_no_die_with_parent(self, tmp_path):
+        users_dir = tmp_path / "users"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(users_dir, "testuser", _make_cfg())
+        content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
+        assert "if [ $# -gt 0 ]" in content
+        exec_branch = content.split("if [ $# -gt 0 ]")[1].split("else")[0]
+        assert "--die-with-parent" not in exec_branch
+
+    def test_launcher_interactive_mode_has_die_with_parent(self, tmp_path):
+        users_dir = tmp_path / "users"
+        launcher_dir = tmp_path / "launchers"
+        launcher_dir.mkdir()
+        self._write_state(users_dir, "testuser", _make_cfg())
+        content = generate_launcher(launcher_dir, users_dir, "testuser").read_text()
+        hash_block = content.split("if [ $# -gt 0 ]")[1]
+        interactive_branch = hash_block.split("else\n")[1].split("\nfi\n")[0]
+        assert "--die-with-parent" in interactive_branch
+
     def test_launcher_has_unshare_user(self, tmp_path):
         users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"

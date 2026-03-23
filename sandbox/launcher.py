@@ -277,9 +277,7 @@ def generate_launcher(
             heredoc_bodies += f"\n{_UNMOUNT_GROUP_SCRIPT}_UNMOUNT_GROUP"
 
 
-    # Build the bwrap flags block
-    session_flag = "  --new-session --die-with-parent \\\n"
-
+    # Build the bwrap flags block (session flag added per-branch below)
     bwrap_flags = (
         "  --unshare-user \\\n"
         f"  --uid {internal_uid} \\\n"
@@ -295,7 +293,6 @@ def generate_launcher(
         f"  --setenv PS1 '({username}@\\w:\\s-\\v)\\$ ' \\\n"
         f"  --setenv PROMPT_COMMAND '[ -n \"$TMUX\" ] && printf \"\\033k%s\\033\\\\\" \"{username}\"' \\\n"
         '  --hostname "${BWRAP_HOSTNAME}" \\\n'
-        f"{session_flag}"
         "  --ro-bind-try /bin /bin \\\n"
         "  --ro-bind-try /sbin /sbin \\\n"
         "  --ro-bind-try /lib /lib \\\n"
@@ -308,15 +305,43 @@ def generate_launcher(
         '  "${EXTRA_MOUNT_ARGS[@]+"${EXTRA_MOUNT_ARGS[@]}"}" \\\n'
     )
 
-    # Build final command block
+    # Build per-mode bwrap commands
+    # Interactive mode: --die-with-parent keeps orphaned shells from lingering
+    # Exec mode: omit --die-with-parent so spawned processes survive the caller
     if network == "loopback":
-        bwrap_cmd = f"  /bin/bash -c 'ip link set lo up 2>/dev/null || true; exec /bin/bash --login'"
+        interactive_bwrap_cmd = (
+            "  /bin/bash -c 'ip link set lo up 2>/dev/null || true;"
+            " exec /bin/bash --login'"
+        )
+        exec_bwrap_cmd = (
+            "  /bin/sh -c 'ip link set lo up 2>/dev/null || true;"
+            ' exec "$@"\' -- "$@"'
+        )
     else:
-        bwrap_cmd = "  /bin/bash --login"
-    final_cmd = (
-        'exec "${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
+        interactive_bwrap_cmd = "  /bin/bash --login"
+        exec_bwrap_cmd = '  "$@"'
+
+    _bwrap_prefix = 'exec "${CGROUP_ARGS[@]+"${CGROUP_ARGS[@]}"}" "$BWRAP" \\\n'
+    _exec_invocation = (
+        _bwrap_prefix
         + bwrap_flags
-        + f"{bwrap_cmd}{resolv_redir}{fd_redirects}{heredoc_bodies}\n"
+        + "  --new-session \\\n"
+        + f"{exec_bwrap_cmd}"
+        + f"{resolv_redir}{fd_redirects}{heredoc_bodies}\n"
+    )
+    _interactive_invocation = (
+        _bwrap_prefix
+        + bwrap_flags
+        + "  --new-session --die-with-parent \\\n"
+        + f"{interactive_bwrap_cmd}"
+        + f"{resolv_redir}{fd_redirects}{heredoc_bodies}\n"
+    )
+    final_cmd = (
+        "if [ $# -gt 0 ]; then\n"
+        + _exec_invocation
+        + "else\n"
+        + _interactive_invocation
+        + "fi\n"
     )
 
     script = (
