@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 *.egg-info/
 opt-sandbox.conf.prepopulated
+stress_test.py
