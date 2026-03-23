@@ -294,7 +294,11 @@ network     = full     # full | loopback | none  (default: full)
 # cgroup-cpu =         # CPU quota, e.g. 50% (systemd cgroup)
 
 [sandbox]
-# bind = /host/path:/sandbox/path
+# Read-write bind:  bind    = /src:/dest   or  bind = /path
+# Read-only bind:   ro-bind = /src:/dest   or  bind = /src:/dest:ro
+# Multiple entries allowed. Tip: mount a full tool tree so internal
+# symlinks resolve (e.g. Homebrew bin → Caskroom):
+# ro-bind = /home/linuxbrew/.linuxbrew:/home/linuxbrew/.linuxbrew
 hostname    =          # Custom hostname (default: sandbox-<username>)
 
 [shadow]
