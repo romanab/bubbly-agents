@@ -75,6 +75,14 @@ uv pip install -e .
 
 `uv venv` creates `.venv/` inside the project directory. With direnv, `sandbox-ctl` and `sandbox-tui` are available immediately on entering the project directory without manually running `source .venv/bin/activate`.
 
+#### Updating after a new release
+
+```bash
+cd bubbly-agents
+git pull origin main
+uv pip install -e .
+```
+
 ---
 
 ### Quick start
