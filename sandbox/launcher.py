@@ -34,6 +34,7 @@ _JOBCTL_SCRIPT = (
     '  if [ -s "$_PIDS_FILE" ]; then\n'
     '    while IFS= read -r _p; do\n'
     '      [ -z "$_p" ] && continue\n'
+    '      [ -d "/proc/$_p" ] || continue\n'
     '      _c=$(tr "\\0" " " < "/proc/$_p/cmdline" 2>/dev/null | cut -c1-60)\n'
     '      [ -z "$_c" ] && continue\n'
     '      _t=$(grep "^State:" "/proc/$_p/status" 2>/dev/null | cut -f2 | cut -c1)\n'
