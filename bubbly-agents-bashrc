@@ -50,4 +50,7 @@ _bubbly_tmux_check() {
         [[ "${_reply,,}" != "n" ]] && tmux new-session -s sandboxes -c ~/bubbly-agents
     fi
 }
-PROMPT_COMMAND="_bubbly_tmux_check${PROMPT_COMMAND:+; ${PROMPT_COMMAND}}"
+_bubbly_tmux_title() {
+    [ -n "$TMUX" ] && tmux rename-window "${USER}@${HOSTNAME%%.*}" 2>/dev/null || true
+}
+PROMPT_COMMAND="_bubbly_tmux_check; _bubbly_tmux_title${PROMPT_COMMAND:+; ${PROMPT_COMMAND}}"
