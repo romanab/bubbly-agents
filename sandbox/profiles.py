@@ -84,12 +84,15 @@ def load_profile(profiles_dir: Path, name: str) -> Profile:
             key, _, val = line.partition("=")
             key = key.strip()
             val = val.strip()
-            if key == "bind":
-                if ":" in val:
-                    src, _, dest = val.partition(":")
-                    bind_entries.append(MountEntry("--bind", src.strip(), dest.strip()))
+            if key in ("bind", "ro-bind"):
+                parts = [p.strip() for p in val.split(":")]
+                src = parts[0]
+                dest = parts[1] if len(parts) >= 2 else src
+                if key == "ro-bind" or (len(parts) >= 3 and parts[2] == "ro"):
+                    kind = "--ro-bind"
                 else:
-                    bind_entries.append(MountEntry("--bind", val, val))
+                    kind = "--bind"
+                bind_entries.append(MountEntry(kind, src, dest))
 
     # Effective hostname: sandbox section overrides user section
     hostname = sandbox_hostname if sandbox_hostname else user.hostname
@@ -166,8 +169,6 @@ def write_profile(profiles_dir: Path, profile_name: str, profile: "Profile") -> 
         lines.append("sys-dirs = true")
     if user.network and user.network != "full":
         lines.append(f"network = {user.network}")
-    if profile.hostname:
-        lines.append(f"hostname = {profile.hostname}")
     if user.max_procs:
         lines.append(f"max-procs = {user.max_procs}")
     if user.max_fsize:
@@ -185,6 +186,21 @@ def write_profile(profiles_dir: Path, profile_name: str, profile: "Profile") -> 
     if user.fake_sudo:
         lines.append("fake-sudo = true")
     lines.append("")
+
+    # [sandbox]
+    sandbox_lines = []
+    if profile.hostname:
+        sandbox_lines.append(f"hostname = {profile.hostname}")
+    for m in profile.bind_entries:
+        path_val = m.source if m.source == m.dest else f"{m.source}:{m.dest}"
+        if m.kind == "--ro-bind":
+            sandbox_lines.append(f"ro-bind = {path_val}")
+        else:
+            sandbox_lines.append(f"bind = {path_val}")
+    if sandbox_lines:
+        lines.append("[sandbox]")
+        lines.extend(sandbox_lines)
+        lines.append("")
 
     # [shadow]
     if profile.shadow_paths:
