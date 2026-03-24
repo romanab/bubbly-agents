@@ -398,6 +398,7 @@ def generate_launcher(
             "  hosts shells\n"
             "  ssl ca-certificates\n"
             "  localtime timezone\n"
+            "  alternatives\n"
             ")\n"
             "ETC_ARGS=()\n"
             'for f in "${ETC_FILES[@]}"; do\n'
