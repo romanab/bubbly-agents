@@ -279,6 +279,7 @@ def generate_launcher(
 
     # Build the bwrap flags block (session flag added per-branch below)
     bwrap_flags = (
+        "  --clearenv \\\n"
         "  --unshare-user \\\n"
         f"  --uid {internal_uid} \\\n"
         f"  --gid {internal_gid} \\\n"
@@ -290,9 +291,15 @@ def generate_launcher(
         '  --bind "${USER_HOME}" "${USER_HOME}" \\\n'
         '  --setenv HOME "${USER_HOME}" \\\n'
         '  --chdir "${USER_HOME}" \\\n'
+        f"  --setenv USER {shlex.quote(username)} \\\n"
+        f"  --setenv LOGNAME {shlex.quote(username)} \\\n"
+        "  --setenv SHELL '/bin/bash' \\\n"
+        "  --setenv PATH '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \\\n"
+        "  --setenv SHLVL '1' \\\n"
         f"  --setenv PS1 '({username}@\\w:\\s-\\v)\\$ ' \\\n"
         f"  --setenv PROMPT_COMMAND '[ -n \"$TMUX\" ] && printf \"\\033k%s\\033\\\\\" \"{username}\"' \\\n"
         '  --hostname "${BWRAP_HOSTNAME}" \\\n'
+        '  "${PASSTHROUGH_ENV_ARGS[@]+"${PASSTHROUGH_ENV_ARGS[@]}"}" \\\n'
         "  --ro-bind-try /bin /bin \\\n"
         "  --ro-bind-try /sbin /sbin \\\n"
         "  --ro-bind-try /lib /lib \\\n"
@@ -396,6 +403,14 @@ def generate_launcher(
             "done\n"
             "\n"
             if not sys_dirs else ""
+        )
+        + (
+            "PASSTHROUGH_ENV_ARGS=()\n"
+            "for _v in LANG LC_ALL LC_CTYPE TERM COLORTERM TERM_PROGRAM LS_COLORS \\\n"
+            "          TMUX TMUX_PANE XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS; do\n"
+            '    [[ -n "${!_v:-}" ]] && PASSTHROUGH_ENV_ARGS+=(--setenv "$_v" "${!_v}")\n'
+            "done\n"
+            "\n"
         )
         + final_cmd
     )
