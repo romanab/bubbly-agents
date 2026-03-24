@@ -22,6 +22,7 @@ Designed for giving untrusted or semi-trusted agents access to a machine without
 - `/usr`, `/lib*`, and other system paths can be included or excluded via profile flags
 - Additional host directories can be exposed read-only via `--extra-path`
 - Shared group directories are bind-mounted into members' sandboxes and accessible via `mount-group <group>` inside the sandbox
+- The sandbox starts with a clean environment — only explicitly set variables (`HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH`, `SHLVL`) plus safe terminal and locale vars (`TERM`, `LANG`, `TMUX`, etc.) are present. Project-specific variables from the parent shell (`VIRTUAL_ENV`, `DIRENV_*`, and so on) are never inherited
 
 Per-user configuration is stored in `low_priv_user_dirs/users/<username>/`. The entire runtime tree lives under `low_priv_user_dirs/` and moves with the project folder.
 
@@ -320,8 +321,9 @@ hostname    =          # Custom hostname (default: sandbox-<username>)
 # /usr/bin/jq:/usr/local/bin/jq
 
 [dotfiles]
-# Files from profiles/<name>/dotfiles/ copied to $HOME/.
+# Files from profiles/<name>/ copied to $HOME/.
 # .bashrc
+# .bash_profile
 
 [scripts]
 # post_setup = post_setup.sh   (run as root after creation)
@@ -339,6 +341,15 @@ sandbox-ctl user profile --profile devtools --user alice
 ```
 
 In the TUI, profile selection is available directly in the **New User** form (Users tab → `n`).
+
+### Built-in profiles
+
+| Profile | Description |
+|---------|-------------|
+| `minimal` | No `/usr`, no system dirs. Only `/proc`, `/dev`, `/tmp`, home, and `lib*`. Maximally restrictive. |
+| `devtools` | `/usr` + real `/etc`/`/run`, loopback network, installs `curl` and `python3`, shadows `/usr/local`, `.bashrc` dotfile. |
+| `activate-venv-via-direnv` | For users hosting a git repo with a Python `.venv`. Provides `.bash_profile` (sources `.bashrc` in login shells) and `.bashrc` (Homebrew + direnv hook + venv prompt). Bind-mounts `/home/linuxbrew` so `direnv` is accessible inside bwrap. Full network for git push/pull. After applying, run `direnv allow ~/RepoDir` once inside the sandbox. |
+| `example` | Fully commented template showing all available options. Copy and edit to create a new profile. |
 
 ---
 
