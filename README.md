@@ -403,7 +403,7 @@ jobctl list
 
 # Kill job by number or PID
 jobctl kill %1
-jobctl kill -KILL %2
+jobctl kill %2
 jobctl kill 12345
 
 # Kill all listed jobs
