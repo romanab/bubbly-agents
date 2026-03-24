@@ -151,6 +151,7 @@ def generate_launcher(
     user_home = base.get("USER_HOME", "")
     if not user_home:
         raise ValueError(f"USER_HOME is not set in base state for user '{username}'")
+    sandbox_home = f"/home/{username}"
     hostname = base.get("HOSTNAME", f"sandbox-{username}")
     network = base.get("NETWORK", "full")
     max_procs = base.get("MAX_PROCS", "")
@@ -215,7 +216,7 @@ def generate_launcher(
 
         # Build synthetic passwd content
         passwd_content = (
-            f"{username}:x:{internal_uid}:{internal_gid}::{user_home}:/bin/bash\n"
+            f"{username}:x:{internal_uid}:{internal_gid}::{sandbox_home}:/bin/bash\n"
             "root:x:0:0:root:/root:/bin/sh\n"
         )
 
@@ -288,9 +289,10 @@ def generate_launcher(
         "  --proc /proc \\\n"
         "  --dev /dev \\\n"
         "  --tmpfs /tmp \\\n"
-        '  --bind "${USER_HOME}" "${USER_HOME}" \\\n'
-        '  --setenv HOME "${USER_HOME}" \\\n'
-        '  --chdir "${USER_HOME}" \\\n'
+        "  --dir /home \\\n"
+        f'  --bind "${{USER_HOME}}" {shlex.quote(sandbox_home)} \\\n'
+        f"  --setenv HOME {shlex.quote(sandbox_home)} \\\n"
+        f"  --chdir {shlex.quote(sandbox_home)} \\\n"
         f"  --setenv USER {shlex.quote(username)} \\\n"
         f"  --setenv LOGNAME {shlex.quote(username)} \\\n"
         "  --setenv SHELL '/bin/bash' \\\n"
