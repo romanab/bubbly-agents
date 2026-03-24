@@ -291,8 +291,11 @@ Profiles live in `profiles/<name>/` and contain a `profile.conf` plus optional d
 bind-mounted read-only, giving access to standard binaries and libraries.
 `/etc` and `/run` are *not* bind-mounted by default (`sys-dirs = false`);
 instead a minimal synthetic `/etc` is constructed containing only
-`resolv.conf`, `passwd`, and `group`. Set `sys-dirs = true` to expose the real
-host `/etc` and `/run`.
+`resolv.conf`, `passwd`, and `group`, plus selected host files passed through
+read-only: `hosts`, `shells`, `ssl`, `ca-certificates`, `localtime`,
+`timezone`, and `alternatives` (the last one ensures Debian alternatives
+symlinks such as `/usr/bin/which → /etc/alternatives/which` resolve correctly).
+Set `sys-dirs = true` to expose the full host `/etc` and `/run`.
 
 ### `profile.conf` reference
 
