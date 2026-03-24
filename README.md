@@ -284,6 +284,15 @@ Key bindings are shown in the footer. Press `r` to refresh, `q` to quit.
 
 Profiles live in `profiles/<name>/` and contain a `profile.conf` plus optional dotfiles.
 
+**What the sandbox sees by default** — Every sandbox always gets `/proc`, `/dev`,
+`/tmp`, the user's home directory, and the host's `lib*` symlink trees
+(`/lib`, `/lib64`, etc.). By default (`no-usr = false`) `/usr` is also
+bind-mounted read-only, giving access to standard binaries and libraries.
+`/etc` and `/run` are *not* bind-mounted by default (`sys-dirs = false`);
+instead a minimal synthetic `/etc` is constructed containing only
+`resolv.conf`, `passwd`, and `group`. Set `sys-dirs = true` to expose the real
+host `/etc` and `/run`.
+
 ### `profile.conf` reference
 
 ```ini
