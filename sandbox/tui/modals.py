@@ -58,6 +58,7 @@ class OutputScreen(ModalScreen[bool]):
 
     def on_mount(self) -> None:
         self.query_one(RichLog).write(self._text)
+        self.query_one(Button).focus()
 
     @on(Button.Pressed, "#ok")
     def ok(self) -> None:
