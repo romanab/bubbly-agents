@@ -363,6 +363,108 @@ In the TUI, profile selection is available directly in the **New User** form (Us
 | `activate-venv-via-direnv` | For users hosting a git repo with a Python `.venv`. Provides `.bash_profile` (sources `.bashrc` in login shells) and `.bashrc` (Homebrew + direnv hook + venv prompt). Bind-mounts `/home/linuxbrew` so `direnv` is accessible inside bwrap. Full network for git push/pull. After applying, run `direnv allow ~/RepoDir` once inside the sandbox. |
 | `example` | Fully commented template showing all available options. Copy and edit to create a new profile. |
 
+### Modifying an Existing Sandbox
+
+To add (or remove) bind mounts after a sandbox has been created, choose one of
+two approaches depending on how the user was set up.
+
+#### Profile-managed user
+
+Edit the `[sandbox]` section of `profiles/<name>/profile.conf`, then re-apply
+the profile. Re-applying merges new mounts into the existing state (duplicates
+are dropped) and regenerates the launcher automatically.
+
+```ini
+[sandbox]
+bind    = /tmp/.X11-unix/X0          # read-write (same src and dest)
+ro-bind = /etc/alternatives:/etc/alternatives  # read-only
+```
+
+```bash
+sandbox-ctl user profile --profile myprofile --user alice
+```
+
+#### Per-user (profile-less or one-off)
+
+Edit `low_priv_user_dirs/users/<username>/extra-mounts` directly. The file
+stores mounts as groups of three lines: bwrap flag, source path, dest path.
+
+```
+--bind
+/tmp/.X11-unix/X0
+/tmp/.X11-unix/X0
+--ro-bind
+/etc/alternatives
+/etc/alternatives
+```
+
+Then regenerate the launcher to pick up the changes:
+
+```bash
+sandbox-ctl user regen --user alice
+```
+
+Either way, changes take effect the next time the sandbox is launched — running
+sessions are not affected until they restart.
+
+### GUI Applications (X11)
+
+Running graphical apps inside a sandbox requires three things: the X11 socket,
+the `DISPLAY` variable, and Xauthority credentials.
+
+**1. Bind-mount the X11 socket**
+
+Add to the `[sandbox]` section of the profile (or to `extra-mounts` directly):
+
+```ini
+[sandbox]
+bind = /tmp/.X11-unix:/tmp/.X11-unix
+```
+
+Binding the whole directory rather than a single socket file (e.g.
+`/tmp/.X11-unix/X0`) covers multi-display setups (`:0`, `:1`, …).
+
+Note: bubbly-agents mounts `/tmp` as a fresh tmpfs, so the socket is not
+accessible unless explicitly bind-mounted. bwrap auto-creates the destination
+directory inside the tmpfs.
+
+**2. Pass through `DISPLAY`**
+
+`DISPLAY` is not in the default passthrough list. Set it in the profile's
+`on-enter` script, or add it to the passthrough loop in `launcher.py`:
+
+```bash
+# profiles/myprofile/on-enter.sh
+export DISPLAY=:0
+```
+
+```ini
+[scripts]
+on-enter = on-enter.sh
+```
+
+Alternatively, edit the passthrough variable list in `sandbox/launcher.py`
+to include `DISPLAY` if you want it forwarded from the host automatically.
+
+**3. Provide Xauthority credentials**
+
+X11 clients authenticate using a magic cookie stored in `~/.Xauthority`. The
+sandbox home is isolated, so the host's cookie is not present by default.
+Because the cookie is tied to the display (not the UID), the host file can
+simply be made visible inside the sandbox.
+
+Bind-mount it read-only into the sandbox home:
+
+```ini
+[sandbox]
+ro-bind = /home/agents/.Xauthority:/home/<sandbox-username>/.Xauthority
+```
+
+Or copy it via an `on-enter` script if the source path varies.
+
+`XAUTHORITY` does not need to be set explicitly: X11 clients default to
+`$HOME/.Xauthority`, which resolves correctly inside the sandbox.
+
 ---
 
 ## Shared Groups
