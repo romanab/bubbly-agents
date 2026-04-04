@@ -37,4 +37,3 @@ class Profile:
     install_entries: list[str]  # "host_path[:dest]"
     dotfiles: list[str]
     post_setup: str
-    on_enter: str

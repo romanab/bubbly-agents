@@ -117,14 +117,9 @@ class ProfilesPane(Widget):
             for d in p.dotfiles:
                 lines.append(f"  {d}")
 
-        scripts = []
         if p.post_setup:
-            scripts.append("post_setup.sh")
-        if p.on_enter:
-            scripts.append("on_enter.sh")
-        if scripts:
             lines.append("")
-            lines.append(f"Scripts:  {', '.join(scripts)}")
+            lines.append("Scripts:  post_setup.sh")
 
         self.app.push_screen(OutputScreen("\n".join(lines)))
 

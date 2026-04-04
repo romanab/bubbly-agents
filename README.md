@@ -340,7 +340,6 @@ hostname    =          # Custom hostname (default: sandbox-<username>)
 
 [scripts]
 # post_setup = post_setup.sh   (run as root after creation)
-# on_enter   = on_enter.sh     (sourced inside sandbox on login)
 ```
 
 ### Applying a profile

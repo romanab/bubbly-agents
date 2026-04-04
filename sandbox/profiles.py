@@ -110,13 +110,6 @@ def load_profile(profiles_dir: Path, name: str) -> Profile:
         post_setup = script_path.read_text(encoding="utf-8") if script_path.exists() else ""
     else:
         post_setup = post_setup_val
-    on_enter_val = scripts_kv.get("on_enter", "")
-    if on_enter_val.endswith(".sh"):
-        script_path = profiles_dir / name / on_enter_val
-        on_enter = script_path.read_text(encoding="utf-8") if script_path.exists() else ""
-    else:
-        on_enter = on_enter_val
-
     return Profile(
         name=name,
         description=description,
@@ -127,7 +120,6 @@ def load_profile(profiles_dir: Path, name: str) -> Profile:
         install_entries=install_entries,
         dotfiles=dotfiles,
         post_setup=post_setup,
-        on_enter=on_enter,
     )
 
 
@@ -224,12 +216,9 @@ def write_profile(profiles_dir: Path, profile_name: str, profile: "Profile") -> 
         lines.append("")
 
     # [scripts]
-    if profile.post_setup or profile.on_enter:
+    if profile.post_setup:
         lines.append("[scripts]")
-        if profile.post_setup:
-            lines.append("post_setup = post_setup.sh")
-        if profile.on_enter:
-            lines.append("on_enter = on_enter.sh")
+        lines.append("post_setup = post_setup.sh")
         lines.append("")
 
     conf_path.write_text("\n".join(lines), encoding="utf-8")

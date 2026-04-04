@@ -975,8 +975,6 @@ class CreateProfileScreen(ModalScreen[bool]):
             yield Label("[bold]Scripts[/bold]")
             yield Label("Post-setup (runs as root after user creation):")
             yield TextArea(src.post_setup if src else "", id="post-setup")
-            yield Label("On-enter (sourced inside sandbox on login):")
-            yield TextArea(src.on_enter if src else "", id="on-enter")
 
             with Horizontal():
                 yield Button("Preview", id="preview")
@@ -1117,7 +1115,6 @@ class CreateProfileScreen(ModalScreen[bool]):
             install_entries=self._read_table_rows("install-table"),
             dotfiles=[],
             post_setup=self.query_one("#post-setup", TextArea).text,
-            on_enter=self.query_one("#on-enter", TextArea).text,
         )
 
     def _validate(self, name: str) -> str | None:
@@ -1189,9 +1186,6 @@ class CreateProfileScreen(ModalScreen[bool]):
         if profile.post_setup:
             lines.append(f"\n[scripts] post_setup = post_setup.sh")
             lines.append(f"  (content: {len(profile.post_setup)} chars)")
-        if profile.on_enter:
-            lines.append(f"[scripts] on_enter = on_enter.sh")
-            lines.append(f"  (content: {len(profile.on_enter)} chars)")
         self.app.push_screen(OutputScreen("\n".join(lines)))
 
     @on(Button.Pressed, "#save")
@@ -1231,8 +1225,6 @@ class CreateProfileScreen(ModalScreen[bool]):
                     final_basenames.append(basename)
         if profile.post_setup:
             (profile_dir / "post_setup.sh").write_text(profile.post_setup, encoding="utf-8")
-        if profile.on_enter:
-            (profile_dir / "on_enter.sh").write_text(profile.on_enter, encoding="utf-8")
         profile.dotfiles = final_basenames
         from sandbox.profiles import write_profile
         write_profile(self._profiles_dir, name, profile)

@@ -523,7 +523,6 @@ class TestModels:
             install_entries=["some-pkg"],
             dotfiles=[".bashrc"],
             post_setup="echo done",
-            on_enter="echo entered",
         )
         assert p.name == "dev"
         assert p.description == "Development profile"
@@ -534,4 +533,3 @@ class TestModels:
         assert p.install_entries == ["some-pkg"]
         assert p.dotfiles == [".bashrc"]
         assert p.post_setup == "echo done"
-        assert p.on_enter == "echo entered"
