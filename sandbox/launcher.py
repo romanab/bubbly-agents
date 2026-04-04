@@ -398,6 +398,7 @@ def generate_launcher(
             "  ssl ca-certificates\n"
             "  localtime timezone\n"
             "  alternatives\n"
+            "  fonts\n"
             ")\n"
             "ETC_ARGS=()\n"
             'for f in "${ETC_FILES[@]}"; do\n'
@@ -409,7 +410,7 @@ def generate_launcher(
         + (
             "PASSTHROUGH_ENV_ARGS=()\n"
             "for _v in LANG LC_ALL LC_CTYPE TERM COLORTERM TERM_PROGRAM LS_COLORS \\\n"
-            "          TMUX TMUX_PANE XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS; do\n"
+            "          TMUX TMUX_PANE XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS DISPLAY; do\n"
             '    [[ -n "${!_v:-}" ]] && PASSTHROUGH_ENV_ARGS+=(--setenv "$_v" "${!_v}")\n'
             "done\n"
             "\n"
