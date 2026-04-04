@@ -117,7 +117,7 @@ sandbox-ctl user run    --user NAME
 sandbox-ctl user audit  --user NAME
 sandbox-ctl user regen  --user NAME
 sandbox-ctl user delete --user NAME [--keep-home] [--force] [--dry-run]
-sandbox-ctl user profile      --profile NAME --user NAME [--dry-run]
+sandbox-ctl user profile      --profile NAME --user NAME [--existing] [--dry-run]
 sandbox-ctl user profile-list
 sandbox-ctl user install --sandbox NAME --binary PATH [--dest PATH] [--dry-run]
 ```
@@ -293,8 +293,9 @@ bind-mounted read-only, giving access to standard binaries and libraries.
 instead a minimal synthetic `/etc` is constructed containing only
 `resolv.conf`, `passwd`, and `group`, plus selected host files passed through
 read-only: `hosts`, `shells`, `ssl`, `ca-certificates`, `localtime`,
-`timezone`, and `alternatives` (the last one ensures Debian alternatives
-symlinks such as `/usr/bin/which → /etc/alternatives/which` resolve correctly).
+`timezone`, `alternatives` (ensures Debian alternatives symlinks such as
+`/usr/bin/which → /etc/alternatives/which` resolve correctly), and `fonts`
+(so fontconfig can load its default config for GUI applications).
 Set `sys-dirs = true` to expose the full host `/etc` and `/run`.
 
 ### `profile.conf` reference
@@ -350,7 +351,12 @@ sandbox-ctl user profile-list
 
 # Apply a profile when creating a user
 sandbox-ctl user profile --profile devtools --user alice
+
+# Retroactively assign a profile to an existing user (skips user creation)
+sandbox-ctl user profile --profile devtools --user alice --existing
 ```
+
+`--existing` skips the user creation step and applies only the profile's installs, mounts, dotfiles, scripts, and profile name assignment. Run `sandbox-ctl user regen --user <name>` afterwards if you want to force a launcher rebuild without re-running the full profile.
 
 In the TUI, profile selection is available directly in the **New User** form (Users tab → `n`).
 
@@ -430,40 +436,29 @@ directory inside the tmpfs.
 
 **2. Pass through `DISPLAY`**
 
-`DISPLAY` is not in the default passthrough list. Set it in the profile's
-`on-enter` script, or add it to the passthrough loop in `launcher.py`:
+`DISPLAY` is passed through automatically from the host environment — no
+`on-enter` script or manual export needed. As long as `DISPLAY` is set in the
+admin shell that launches the sandbox, X11 clients inside will see it.
 
-```bash
-# profiles/myprofile/on-enter.sh
-export DISPLAY=:0
-```
+**3. Fontconfig**
 
-```ini
-[scripts]
-on-enter = on-enter.sh
-```
+`/etc/fonts` is bind-mounted read-only automatically (alongside `hosts`,
+`localtime`, and other `/etc` passthrough files), so fontconfig resolves its
+default config without any extra setup.
 
-Alternatively, edit the passthrough variable list in `sandbox/launcher.py`
-to include `DISPLAY` if you want it forwarded from the host automatically.
+**4. Xauthority (magic cookie)**
 
-**3. Provide Xauthority credentials**
-
-X11 clients authenticate using a magic cookie stored in `~/.Xauthority`. The
-sandbox home is isolated, so the host's cookie is not present by default.
-Because the cookie is tied to the display (not the UID), the host file can
-simply be made visible inside the sandbox.
-
-Bind-mount it read-only into the sandbox home:
+X11 clients authenticate using a magic cookie stored in `~/.Xauthority`. In
+most setups the cookie is not needed because the X server allows connections
+from the same UID without one. If you do need it, bind-mount it read-only:
 
 ```ini
 [sandbox]
 ro-bind = /home/agents/.Xauthority:/home/<sandbox-username>/.Xauthority
 ```
 
-Or copy it via an `on-enter` script if the source path varies.
-
-`XAUTHORITY` does not need to be set explicitly: X11 clients default to
-`$HOME/.Xauthority`, which resolves correctly inside the sandbox.
+Only add this if connections are actually being refused — and make sure the
+source path exists, otherwise bwrap will fail to launch.
 
 ---
 
