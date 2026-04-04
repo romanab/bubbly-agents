@@ -491,6 +491,8 @@ sandbox-ctl group chmod --group devs --mode u=rwx,g=rx,o=
 
 Members listed in a group can use `mount-group <name>` to access it. The `mount-group` and `unmount-group` scripts are injected into `/usr/local/bin/` inside the sandbox.
 
+Group directories are mounted at `/run/sandbox-groups/<groupname>` inside the sandbox (not at their host path). `mount-group` creates a symlink `~/<groupname> -> /run/sandbox-groups/<groupname>`. This keeps the host directory structure hidden: `cd ..` from inside the group dir leads only to the empty `/run/sandbox-groups/` directory rather than traversing the host filesystem.
+
 ---
 
 ## Shell Experience

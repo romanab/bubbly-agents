@@ -4,7 +4,7 @@ from pathlib import Path
 from sandbox.state import read_base, read_extra_mounts, read_ids
 
 
-def _make_mount_group_script(groups_dir: str) -> str:
+def _make_mount_group_script() -> str:
     return (
         "#!/bin/sh\n"
         'GROUP="$1"\n'
@@ -12,8 +12,7 @@ def _make_mount_group_script(groups_dir: str) -> str:
         '    echo "Usage: mount-group <group>" >&2\n'
         "    exit 1\n"
         "fi\n"
-        f'GROUPS_DIR={shlex.quote(groups_dir)}\n'
-        'GROUP_DIR="$GROUPS_DIR/$GROUP/$GROUP.group-dir"\n'
+        'GROUP_DIR="/run/sandbox-groups/$GROUP"\n'
         'if [ ! -d "$GROUP_DIR" ]; then\n'
         '    echo "Error: group \'$GROUP\' not available (not a member or directory not mounted)" >&2\n'
         "    exit 1\n"
@@ -273,7 +272,7 @@ def generate_launcher(
             local_bin_lines += "  --chmod 0755 /usr/local/bin/unmount-group \\\n"
             fd_redirects += f" {mount_fd_num}<<'_MOUNT_GROUP' {unmount_fd_num}<<'_UNMOUNT_GROUP'"
             # mount_group_script ends with \n so _MOUNT_GROUP lands on its own line
-            mount_group_script = _make_mount_group_script(str(groups_dir))
+            mount_group_script = _make_mount_group_script()
             heredoc_bodies += f"\n{mount_group_script}_MOUNT_GROUP"
             heredoc_bodies += f"\n{_UNMOUNT_GROUP_SCRIPT}_UNMOUNT_GROUP"
 

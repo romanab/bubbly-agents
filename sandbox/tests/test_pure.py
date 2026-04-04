@@ -378,8 +378,8 @@ class TestLauncher:
             if "ETC_FILES" in line or (line.strip().startswith("passwd") or line.strip().startswith("group")):
                 assert "passwd group" not in line
 
-    def test_mount_group_script_uses_group_dir_suffix(self, tmp_path):
-        """mount-group script must resolve GROUP_DIR via {name}.group-dir subdir."""
+    def test_mount_group_script_uses_internal_path(self, tmp_path):
+        """mount-group script must use the fixed internal path /run/sandbox-groups/$GROUP."""
         users_dir = tmp_path / "users"
         launcher_dir = tmp_path / "launchers"
         launcher_dir.mkdir()
@@ -394,7 +394,8 @@ class TestLauncher:
         add_group_bind_mount(users_dir, "testuser", grp_shared)
         path = generate_launcher(launcher_dir, users_dir, "testuser")
         content = path.read_text()
-        assert '$GROUP/$GROUP.group-dir' in content
+        assert '/run/sandbox-groups/$GROUP' in content
+        assert 'group-dir' not in content.split('EXTRA_MOUNT_ARGS')[0]  # not in script body
 
     def test_launcher_group_gid_extraction_uses_parent_name(self, tmp_path):
         """Synthetic /etc/group must use the group container name, not 'group-dir'."""

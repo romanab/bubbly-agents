@@ -140,9 +140,11 @@ def write_profile_name(state_dir: Path, username: str, name: str, dry_run: bool 
 def add_group_bind_mount(state_dir: Path, username: str, group_dir: Path, dry_run=False):
     em_file = state_dir / username / "extra-mounts"
     group_str = str(group_dir)
+    group_name = group_dir.parent.name
+    internal_dest = f"/run/sandbox-groups/{group_name}"
 
     if dry_run:
-        print(f"[dry-run] would add --bind {group_str} {group_str} to {em_file}")
+        print(f"[dry-run] would add --bind {group_str} {internal_dest} to {em_file}")
         return
 
     # Ensure file exists
@@ -152,10 +154,10 @@ def add_group_bind_mount(state_dir: Path, username: str, group_dir: Path, dry_ru
 
     existing = read_extra_mounts(state_dir, username)
     for m in existing:
-        if m.kind == "--bind" and m.source == group_str and m.dest == group_str:
-            return  # already present
+        if m.kind == "--bind" and m.source == group_str:
+            return  # already present (source match handles both old and new style)
 
-    existing.append(MountEntry("--bind", group_str, group_str))
+    existing.append(MountEntry("--bind", group_str, internal_dest))
     write_extra_mounts(state_dir, username, existing)
 
 
@@ -172,12 +174,14 @@ def remove_group_bind_mount(state_dir: Path, username: str, group_dir: Path, dry
         return
 
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    # Rebuild triples, skipping any that reference group_str
+    # Rebuild triples, skipping any whose source matches the group dir.
+    # Matching on source handles both old-style entries (src==dest==host_path)
+    # and new-style entries (src=host_path, dest=/run/sandbox-groups/<name>).
     kept: list[str] = []
     i = 0
     while i + 2 < len(lines):
         kind, src, dst = lines[i], lines[i + 1], lines[i + 2]
-        if src == group_str or dst == group_str:
+        if src == group_str:
             i += 3
             continue
         kept.extend([kind, src, dst])
