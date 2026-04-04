@@ -240,9 +240,10 @@ def delete_profile(profiles_dir: Path, name: str) -> None:
     shutil.rmtree(profiles_dir / name)
 
 
-def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run: bool = False) -> None:
+def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run: bool = False, existing: bool = False) -> None:
     """
-    Apply a profile to create and configure a new sandbox user.
+    Apply a profile to create and configure a sandbox user.
+    Pass existing=True to skip user creation and apply to an already-existing user.
     """
     profiles_dir = cfg.project_root / "profiles"
     profile = load_profile(profiles_dir, profile_name)
@@ -254,9 +255,10 @@ def apply_profile(cfg: SandboxConfig, profile_name: str, username: str, dry_run:
     if profile.hostname:
         profile.user.hostname = profile.hostname
 
-    # 1. Create user
-    from sandbox.users import create_user
-    create_user(cfg, profile.user, dry_run)
+    # 1. Create user (skip if applying retroactively to an existing user)
+    if not existing:
+        from sandbox.users import create_user
+        create_user(cfg, profile.user, dry_run)
 
     # 2. Install binaries
     from sandbox.installs import install_binary

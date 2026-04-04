@@ -135,14 +135,15 @@ def user_delete(ctx, user, keep_home, force, dry_run):
 @user_group.command('profile')
 @click.option('--profile', required=True, help='Profile name')
 @click.option('--user', required=True, help='Username to create')
+@click.option('--existing', is_flag=True, help='Apply to an already-existing user (skip user creation)')
 @click.option('--dry-run', is_flag=True)
 @click.pass_context
-def user_profile(ctx, profile, user, dry_run):
+def user_profile(ctx, profile, user, existing, dry_run):
     """Apply a profile template to create a sandbox user."""
     cfg = ctx.obj['cfg']
     try:
         from sandbox.profiles import apply_profile
-        apply_profile(cfg, profile, user, dry_run)
+        apply_profile(cfg, profile, user, dry_run, existing=existing)
         if not dry_run:
             click.echo(f"Profile '{profile}' applied to user '{user}'.")
     except (SandboxError, ValueError, FileNotFoundError) as e:
